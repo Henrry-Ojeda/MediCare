@@ -1,0 +1,6 @@
+{
+  "name": "MedCore AI — SaaS Médico Multi-Especialidad & EMR",
+  "description": "Sistema EMR ambulatorio multi-especialidad con Copiloto Clínico de IA, Vacunación OMS, Sala de Espera Kanban y Facturación Bimoneda BCV.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
