@@ -3,47 +3,84 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { MedicalProvider, useMedical } from './context/MedicalContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { ClinicalModals } from './components/modals/ClinicalModals';
-import {
-  LoginView,
-  RecoverPasswordView,
-  ResetPasswordView,
-  OnboardingView,
-  DoctorProfileView,
-  AuditLogView,
-} from './views/AuthAndSecurityViews';
-import {
-  MedicalAgendaView,
-  WaitingRoomKanbanView,
-} from './views/AgendaAndWaitingRoomViews';
-import {
-  PatientDirectoryView,
-  Patient360View,
-  NewPatientFormView,
-  VaccinationCardView,
-  MasterVaccineCatalogView,
-} from './views/PatientsAndVaccinesViews';
-import { ActiveConsultationView } from './views/ActiveConsultationView';
-import {
-  CashbookView,
-  MedicalReceiptsView,
-  AnalyticsDashboardView,
-  EpidemiologyReportView,
-} from './views/FinanceAndReportsViews';
-import {
-  ClinicSettingsView,
-  RecipeTemplateDesignerView,
-  SaasSubscriptionView,
-} from './views/SettingsAndSubscriptionViews';
+
+const LoginView = lazy(() => import('./modules/auth').then((m) => ({ default: m.LoginView })));
+const RecoverPasswordView = lazy(() =>
+  import('./modules/auth').then((m) => ({ default: m.RecoverPasswordView }))
+);
+const ResetPasswordView = lazy(() =>
+  import('./modules/auth').then((m) => ({ default: m.ResetPasswordView }))
+);
+const OnboardingView = lazy(() =>
+  import('./modules/auth').then((m) => ({ default: m.OnboardingView }))
+);
+const DoctorProfileView = lazy(() =>
+  import('./modules/auth').then((m) => ({ default: m.DoctorProfileView }))
+);
+const AuditLogView = lazy(() =>
+  import('./modules/auth').then((m) => ({ default: m.AuditLogView }))
+);
+
+const MedicalAgendaView = lazy(() =>
+  import('./modules/agenda').then((m) => ({ default: m.MedicalAgendaView }))
+);
+const WaitingRoomKanbanView = lazy(() =>
+  import('./modules/agenda').then((m) => ({ default: m.WaitingRoomKanbanView }))
+);
+
+const PatientDirectoryView = lazy(() =>
+  import('./modules/pacientes').then((m) => ({ default: m.PatientDirectoryView }))
+);
+const Patient360View = lazy(() =>
+  import('./modules/pacientes').then((m) => ({ default: m.Patient360View }))
+);
+const NewPatientFormView = lazy(() =>
+  import('./modules/pacientes').then((m) => ({ default: m.NewPatientFormView }))
+);
+
+const VaccinationCardView = lazy(() =>
+  import('./modules/vacunacion').then((m) => ({ default: m.VaccinationCardView }))
+);
+const MasterVaccineCatalogView = lazy(() =>
+  import('./modules/vacunacion').then((m) => ({ default: m.MasterVaccineCatalogView }))
+);
+
+const ActiveConsultationView = lazy(() =>
+  import('./modules/consulta').then((m) => ({ default: m.ActiveConsultationView }))
+);
+
+const CashbookView = lazy(() =>
+  import('./modules/finanzas').then((m) => ({ default: m.CashbookView }))
+);
+const MedicalReceiptsView = lazy(() =>
+  import('./modules/finanzas').then((m) => ({ default: m.MedicalReceiptsView }))
+);
+
+const AnalyticsDashboardView = lazy(() =>
+  import('./modules/reportes').then((m) => ({ default: m.AnalyticsDashboardView }))
+);
+const EpidemiologyReportView = lazy(() =>
+  import('./modules/reportes').then((m) => ({ default: m.EpidemiologyReportView }))
+);
+
+const ClinicSettingsView = lazy(() =>
+  import('./modules/configuracion').then((m) => ({ default: m.ClinicSettingsView }))
+);
+const RecipeTemplateDesignerView = lazy(() =>
+  import('./modules/configuracion').then((m) => ({ default: m.RecipeTemplateDesignerView }))
+);
+const SaasSubscriptionView = lazy(() =>
+  import('./modules/configuracion').then((m) => ({ default: m.SaasSubscriptionView }))
+);
 
 const ViewRouter: React.FC = () => {
   const { currentView } = useMedical();
 
   switch (currentView) {
-    // Módulo 1: Autenticación, Onboarding y Seguridad (Vistas 1 a 6)
     case 'login':
       return <LoginView />;
     case 'recuperar-password':
@@ -57,13 +94,11 @@ const ViewRouter: React.FC = () => {
     case 'auditoria':
       return <AuditLogView />;
 
-    // Módulo 2: Agenda, Recepción y Sala de Espera (Vistas 7 a 9)
     case 'agenda':
       return <MedicalAgendaView />;
     case 'sala-espera':
       return <WaitingRoomKanbanView />;
 
-    // Módulo 3: Directorio Integral de Pacientes (Vistas 10 a 12)
     case 'pacientes':
       return <PatientDirectoryView />;
     case 'paciente-detalle':
@@ -71,29 +106,24 @@ const ViewRouter: React.FC = () => {
     case 'paciente-nuevo':
       return <NewPatientFormView />;
 
-    // Módulo 4: Vacunación Pediátrica y Preventiva (Vistas 13 a 15)
     case 'vacunas-carnet':
       return <VaccinationCardView />;
     case 'vacunas-catalogo':
       return <MasterVaccineCatalogView />;
 
-    // Módulo 5: La Consulta Médica Activa con Copiloto IA (Vistas 16 y 17)
     case 'consulta-activa':
       return <ActiveConsultationView />;
 
-    // Módulo 6: Caja, Facturación y Pagos (Vistas 18 y 19)
     case 'caja':
       return <CashbookView />;
     case 'caja-recibos':
       return <MedicalReceiptsView />;
 
-    // Módulo 7: Reportes, Analítica y Epidemiología (Vistas 20 y 21)
     case 'reportes':
       return <AnalyticsDashboardView />;
     case 'epidemiologia':
       return <EpidemiologyReportView />;
 
-    // Módulo 8: Configuración Institucional y Suscripción SaaS (Vistas 22 a 24)
     case 'configuracion':
       return <ClinicSettingsView />;
     case 'plantillas':
@@ -110,7 +140,15 @@ export default function App() {
   return (
     <MedicalProvider>
       <AppLayout>
-        <ViewRouter />
+        <Suspense
+          fallback={
+            <div className="p-8 text-center text-xs font-semibold text-slate-400">
+              Cargando módulo clínico...
+            </div>
+          }
+        >
+          <ViewRouter />
+        </Suspense>
         <ClinicalModals />
       </AppLayout>
     </MedicalProvider>

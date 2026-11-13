@@ -3,6 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
+import { checkDbHealth } from "./server/db.ts";
+import clinicalRoutes from "./server/routes/clinicalRoutes.ts";
 
 dotenv.config();
 
@@ -14,6 +16,27 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: "2mb" }));
+
+  // Healthcheck de servidor y conexión a SQL Server (BD_MEDICARE)
+  app.get("/api/health", async (_req, res) => {
+    const db = await checkDbHealth();
+    res.status(db.connected ? 200 : 503).json({
+      service: "MediCare API",
+      db,
+    });
+  });
+
+  // Rutas REST de módulos clínicos (BD_MEDICARE)
+  app.use("/api", clinicalRoutes);
+
+  // Manejador central de errores API
+  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("Error en API MediCare:", err);
+    res.status(err?.status || 500).json({
+      error: "API_ERROR",
+      message: err?.message || "Error interno en el servidor.",
+    });
+  });
 
   // Server-side Gemini AI Endpoint for Active Consultation Copilot (Vista 16)
   app.post("/api/ai/process-consultation", async (req, res) => {

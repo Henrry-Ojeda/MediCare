@@ -11,13 +11,81 @@ import {
   AlignRight,
 } from 'lucide-react';
 import { useMedical } from '../context/MedicalContext';
-import { Specialty } from '../types/medical';
+import { Specialty, ViewId, ASSISTANT_GRANTABLE_VIEWS } from '../types/medical';
 
 /* ============================================================================
    VISTA 22: AJUSTES DE LA CLÍNICA / CONFIGURACIÓN DEL TENANT (/configuracion)
 ============================================================================ */
 export const ClinicSettingsView: React.FC = () => {
-  const { tenantConfig, updateTenantConfig, showToast } = useMedical();
+  const {
+    tenantConfig,
+    updateTenantConfig,
+    doctors,
+    assistants,
+    saveAssistantAssignment,
+    toggleAssistantPermission,
+    toggleAssistantViewPermission,
+    removeAssistantAssignment,
+    showToast,
+  } = useMedical();
+
+  const [assistantName, setAssistantName] = useState('');
+  const [assistantEmail, setAssistantEmail] = useState('');
+  const [assignmentMode, setAssignmentMode] = useState<'PERSONAL' | 'COMPARTIDA_CLINICA'>('PERSONAL');
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>(['doc-1']);
+  const [permSchedule, setPermSchedule] = useState(true);
+  const [permRegister, setPermRegister] = useState(true);
+  const [permCollect, setPermCollect] = useState(true);
+  const [permReschedule, setPermReschedule] = useState(true);
+  const [selectedViews, setSelectedViews] = useState<ViewId[]>([
+    'agenda',
+    'sala-espera',
+    'pacientes',
+    'paciente-nuevo',
+    'caja',
+  ]);
+
+  const handleToggleNewView = (viewId: ViewId) => {
+    setSelectedViews((prev) =>
+      prev.includes(viewId) ? prev.filter((v) => v !== viewId) : [...prev, viewId]
+    );
+  };
+
+  const handleToggleDoctor = (docId: string) => {
+    if (assignmentMode === 'PERSONAL') {
+      setSelectedDoctorIds([docId]);
+      return;
+    }
+    setSelectedDoctorIds((prev) =>
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const handleAddAssistant = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assistantName.trim() || selectedDoctorIds.length === 0) {
+      showToast('Ingrese el nombre de la asistente y al menos un médico.');
+      return;
+    }
+    const cleanUser = assistantName.trim().toLowerCase().replace(/\s+/g, '.');
+    saveAssistantAssignment({
+      assistantName: assistantName.trim(),
+      assistantUsername: cleanUser,
+      assistantEmail: assistantEmail.trim() || `${cleanUser}@medcoresalud.com`,
+      mode: assignmentMode,
+      assignedDoctorIds: selectedDoctorIds,
+      permissions: {
+        canSchedule: permSchedule,
+        canRegisterPatientInfo: permRegister,
+        canCollectPayments: permCollect,
+        canRescheduleOrCancel: permReschedule,
+      },
+      allowedViews: selectedViews.includes('perfil') ? selectedViews : [...selectedViews, 'perfil'],
+      active: true,
+    });
+    setAssistantName('');
+    setAssistantEmail('');
+  };
 
   const specialtiesList: Specialty[] = [
     'Pediatría',
@@ -142,6 +210,253 @@ export const ClinicSettingsView: React.FC = () => {
             Guardar Configuración Institucional
           </button>
         </div>
+      </div>
+
+      {/* Gestión de Asistentes Personales y Compartidas de Clínica */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              Asistentes Médicas (Personal y Compartida de Clínica)
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Asigne una asistente personal por médico o una asistente compartida para coordinar agenda, registro, cobros y reprogramaciones de varios doctores.
+            </p>
+          </div>
+          <span className="px-3 py-1 rounded-full bg-violet-50 border border-violet-200 text-violet-700 text-xs font-bold">
+            {assistants.length} Asistentes Activas
+          </span>
+        </div>
+
+        {/* Lista de Asistentes Configuradas */}
+        <div className="space-y-3">
+          {assistants.map((asist) => (
+            <div
+              key={asist.id}
+              className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">{asist.assistantName}</span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        asist.mode === 'COMPARTIDA_CLINICA'
+                          ? 'bg-violet-100 text-violet-800'
+                          : 'bg-sky-100 text-sky-800'
+                      }`}
+                    >
+                      {asist.mode === 'COMPARTIDA_CLINICA' ? 'Compartida en Clínica' : 'Asistente Personal'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    Usuario: <span className="font-mono">{asist.assistantUsername}</span> · {asist.assistantEmail}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {asist.assignedDoctorIds.map((docId) => {
+                      const doc = doctors.find((d) => d.id === docId);
+                      return (
+                        <span
+                          key={docId}
+                          className="px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700"
+                        >
+                          {doc ? `${doc.name} (${doc.specialty})` : docId}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeAssistantAssignment(asist.id)}
+                  className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                >
+                  Revocar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200/70">
+                {(
+                  [
+                    ['canSchedule', 'Agendar citas'],
+                    ['canRegisterPatientInfo', 'Registrar información'],
+                    ['canCollectPayments', 'Gestionar cobros'],
+                    ['canRescheduleOrCancel', 'Posponer / acomodar'],
+                  ] as const
+                ).map(([permKey, label]) => {
+                  const enabled = asist.permissions[permKey];
+                  return (
+                    <button
+                      key={permKey}
+                      type="button"
+                      onClick={() => toggleAssistantPermission(asist.id, permKey)}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border text-left transition-colors cursor-pointer ${
+                        enabled
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-white border-slate-200 text-slate-400'
+                      }`}
+                    >
+                      {enabled ? '✓ ' : '✕ '}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 border-t border-slate-200/70 space-y-1.5">
+                <div className="text-[11px] font-bold text-slate-700">
+                  Vistas Autorizadas por el Médico / Admin (Consulta IA y Epidemiología CIE-10 excluidas):
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {ASSISTANT_GRANTABLE_VIEWS.map((viewOpt) => {
+                    const allowed = (asist.allowedViews || []).includes(viewOpt.id);
+                    return (
+                      <button
+                        key={viewOpt.id}
+                        type="button"
+                        title={viewOpt.description}
+                        onClick={() => toggleAssistantViewPermission(asist.id, viewOpt.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer ${
+                          allowed
+                            ? 'bg-sky-50 border-sky-200 text-[#0284C7]'
+                            : 'bg-white border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {allowed ? '✓ ' : '+ '}
+                        {viewOpt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Formulario Nueva Asignación */}
+        <form onSubmit={handleAddAssistant} className="p-4 rounded-xl border border-dashed border-slate-300 bg-white space-y-4">
+          <div className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+            + Asignar Nueva Asistente
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre Completo</label>
+              <input
+                type="text"
+                value={assistantName}
+                onChange={(e) => setAssistantName(e.target.value)}
+                placeholder="Ej. Carla Mendoza"
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Correo Institucional</label>
+              <input
+                type="email"
+                value={assistantEmail}
+                onChange={(e) => setAssistantEmail(e.target.value)}
+                placeholder="carla.mendoza@clinica.com"
+                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Modalidad</label>
+              <select
+                value={assignmentMode}
+                onChange={(e) => {
+                  const mode = e.target.value as 'PERSONAL' | 'COMPARTIDA_CLINICA';
+                  setAssignmentMode(mode);
+                  if (mode === 'PERSONAL' && selectedDoctorIds.length > 1) {
+                    setSelectedDoctorIds([selectedDoctorIds[0]]);
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl"
+              >
+                <option value="PERSONAL">Asistente Personal (1 Médico)</option>
+                <option value="COMPARTIDA_CLINICA">Asistente Compartida (Varios Médicos)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              {assignmentMode === 'PERSONAL' ? 'Médico Asignado' : 'Médicos que Coordinará en Clínica'}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {doctors.map((doc) => {
+                const selected = selectedDoctorIds.includes(doc.id);
+                return (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => handleToggleDoctor(doc.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition-colors ${
+                      selected
+                        ? 'bg-[#F0F9FF] border-[#0284C7] text-[#0284C7]'
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {selected ? '✓ ' : '+ '}
+                    {doc.name} ({doc.specialty})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Vistas que podrá ver esta Asistente
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {ASSISTANT_GRANTABLE_VIEWS.map((viewOpt) => {
+                const selected = selectedViews.includes(viewOpt.id);
+                return (
+                  <button
+                    key={viewOpt.id}
+                    type="button"
+                    onClick={() => handleToggleNewView(viewOpt.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer transition-colors ${
+                      selected
+                        ? 'bg-sky-50 border-sky-200 text-[#0284C7]'
+                        : 'bg-slate-50 border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {selected ? '✓ ' : '+ '}
+                    {viewOpt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={permSchedule} onChange={(e) => setPermSchedule(e.target.checked)} className="accent-[#0284C7]" />
+                Agendar
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={permRegister} onChange={(e) => setPermRegister(e.target.checked)} className="accent-[#0284C7]" />
+                Registrar info
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={permCollect} onChange={(e) => setPermCollect(e.target.checked)} className="accent-[#0284C7]" />
+                Cobrar
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" checked={permReschedule} onChange={(e) => setPermReschedule(e.target.checked)} className="accent-[#0284C7]" />
+                Posponer / acomodar citas
+              </label>
+            </div>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold cursor-pointer"
+            >
+              Guardar Asignación
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

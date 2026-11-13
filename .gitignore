@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.qa.example
+!.env.production.example
+bin/
+obj/
+*.user
+.vs/

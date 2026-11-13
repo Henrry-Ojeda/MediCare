@@ -14,9 +14,15 @@ import {
   Clock,
   Plus,
   Eye,
+  Lock,
+  ShieldCheck,
+  Share2,
+  X,
 } from 'lucide-react';
 import { useMedical, calculateExactAgeLabel } from '../context/MedicalContext';
-import { Specialty } from '../types/medical';
+import { Patient, Specialty } from '../types/medical';
+import { getSpecialtyConfig, SPECIALTY_REGISTRY } from '../config/specialties';
+import { DataTable, StatusBadge } from '../components/common';
 
 /* ============================================================================
    VISTA 10: DIRECTORIO GENERAL DE PACIENTES (/pacientes)
@@ -30,157 +36,152 @@ export const PatientDirectoryView: React.FC = () => {
     navigateToPatientVaccines,
   } = useMedical();
 
-  const [query, setQuery] = useState('');
   const [specialtyFilter, setSpecialtyFilter] = useState<string>('Todas');
 
   const filteredPatients = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return patients.filter((p) => {
-      const matchSpec = specialtyFilter === 'Todas' || p.primarySpecialty === specialtyFilter;
-      if (!q) return matchSpec;
-      const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-      return (
-        matchSpec &&
-        (fullName.includes(q) ||
-          p.historyNumber.toLowerCase().includes(q) ||
-          (p.idDocument || '').toLowerCase().includes(q) ||
-          p.guardianIdDocument.toLowerCase().includes(q) ||
-          p.guardianWhatsapp.toLowerCase().includes(q) ||
-          p.guardianName.toLowerCase().includes(q))
-      );
-    });
-  }, [patients, query, specialtyFilter]);
+    return patients.filter(
+      (p) => specialtyFilter === 'Todas' || p.primarySpecialty === specialtyFilter
+    );
+  }, [patients, specialtyFilter]);
 
   return (
-    <div className="space-y-5">
-      {/* Search & Action Header */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex-1 min-w-[280px] relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar por nombre del paciente, N° de historia, cédula o teléfono/WhatsApp del representante..."
-            className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:outline-none"
-          />
-        </div>
+    <div className="space-y-4">
+      <DataTable<Patient>
+        data={filteredPatients}
+        keyExtractor={(p) => p.id}
+        searchPlaceholder="Buscar por paciente, N° de historia, cédula o WhatsApp..."
+        searchFilter={(p, q) => {
+          const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+          return (
+            fullName.includes(q) ||
+            p.historyNumber.toLowerCase().includes(q) ||
+            (p.idDocument || '').toLowerCase().includes(q) ||
+            p.guardianIdDocument.toLowerCase().includes(q) ||
+            p.guardianWhatsapp.toLowerCase().includes(q) ||
+            p.guardianName.toLowerCase().includes(q)
+          );
+        }}
+        pageSize={8}
+        emptyMessage="No se encontraron pacientes con ese criterio."
+        headerActions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <select
+              value={specialtyFilter}
+              onChange={(e) => setSpecialtyFilter(e.target.value)}
+              className="px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
+            >
+              <option value="Todas">Todas las especialidades</option>
+              {(Object.keys(SPECIALTY_REGISTRY) as Specialty[]).map((spec) => (
+                <option key={spec} value={spec}>
+                  {spec}
+                </option>
+              ))}
+            </select>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={specialtyFilter}
-            onChange={(e) => setSpecialtyFilter(e.target.value)}
-            className="px-3.5 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-800"
-          >
-            <option value="Todas">Todas las especialidades</option>
-            <option value="Pediatría">Pediatría</option>
-            <option value="Ginecología">Ginecología</option>
-            <option value="Medicina Interna / Cardiología">Medicina Interna / Cardiología</option>
-            <option value="Traumatología">Traumatología</option>
-            <option value="Dermatología">Dermatología</option>
-          </select>
-
-          <button
-            onClick={() => setCurrentView('paciente-nuevo')}
-            className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ Nuevo Paciente (Vista 12)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Patient Cards / Rows */}
-      <div className="space-y-3">
-        {filteredPatients.map((patient) => (
-          <div
-            key={patient.id}
-            className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs hover:shadow-md transition-all flex flex-wrap items-center justify-between gap-4"
-          >
-            <div className="flex items-center gap-4 min-w-[280px]">
-              <div className="w-12 h-12 rounded-2xl bg-[#F0F9FF] text-[#0284C7] font-bold text-sm flex items-center justify-center border border-sky-200 shrink-0">
-                {patient.firstName[0]}
-                {patient.lastName[0]}
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setCurrentView('paciente-nuevo')}
+              className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Nuevo Paciente (Vista 12)</span>
+            </button>
+          </div>
+        }
+        columns={[
+          {
+            key: 'patient',
+            header: 'Paciente / Historia',
+            sortable: true,
+            sortValue: (p) => `${p.firstName} ${p.lastName}`,
+            render: (patient) => (
+              <div className="flex items-center gap-3 min-w-[220px]">
+                <div className="w-10 h-10 rounded-xl bg-[#F0F9FF] text-[#0284C7] font-bold text-xs flex items-center justify-center border border-sky-200 shrink-0">
+                  {patient.firstName[0]}
+                  {patient.lastName[0]}
+                </div>
+                <div>
                   <button
                     onClick={() => navigateToPatient360(patient.id)}
-                    className="text-sm font-bold text-slate-900 hover:text-[#0284C7] cursor-pointer"
+                    className="text-xs font-bold text-slate-900 hover:text-[#0284C7] cursor-pointer text-left"
                   >
                     {patient.firstName} {patient.lastName}
                   </button>
-                  <span className="text-xs text-slate-400">·</span>
-                  <span className="text-xs font-mono font-semibold text-slate-600">
-                    {patient.historyNumber}
-                  </span>
-                  <span className="text-xs text-slate-400">·</span>
-                  <span className="text-xs font-semibold text-[#0284C7]">
-                    {calculateExactAgeLabel(patient.birthDate)}
-                  </span>
-                  <span className="text-xs text-slate-400">·</span>
-                  <span className="text-xs text-slate-500">
-                    Sexo: {patient.sex === 'M' ? 'Masculino' : 'Femenino'}
-                  </span>
-                </div>
-
-                {/* Tutor & WhatsApp Info */}
-                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span>
-                    Tutor: <strong className="text-slate-700">{patient.guardianName}</strong> ({patient.guardianRelation} · {patient.guardianIdDocument})
-                  </span>
-                  <a
-                    href={`https://wa.me/${patient.guardianWhatsapp.replace(/[^0-9]/g, '')}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 font-mono font-semibold text-[#059669] hover:underline"
-                  >
-                    <Phone className="w-3 h-3" />
-                    {patient.guardianWhatsapp}
-                  </a>
+                  <div className="text-[11px] font-mono text-slate-500">
+                    {patient.historyNumber} · {calculateExactAgeLabel(patient.birthDate)} ·{' '}
+                    {patient.sex === 'M' ? 'M' : 'F'}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Severe Allergy Alert & Quick Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3">
-              {patient.criticalAllergies.length > 0 && (
-                <div className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-[#E11D48] text-xs font-bold flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{patient.criticalAllergies[0]}</span>
-                </div>
-              )}
-
-              {patient.primarySpecialty === 'Pediatría' && (
-                <button
-                  onClick={() => navigateToPatientVaccines(patient.id)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer"
+            ),
+          },
+          {
+            key: 'specialty',
+            header: 'Especialidad Base',
+            sortable: true,
+            sortValue: (p) => p.primarySpecialty,
+            render: (patient) => <StatusBadge label={patient.primarySpecialty} variant="info" />,
+          },
+          {
+            key: 'guardian',
+            header: 'Representante / Contacto',
+            render: (patient) => (
+              <div className="text-xs">
+                <div className="font-semibold text-slate-800">{patient.guardianName}</div>
+                <a
+                  href={`https://wa.me/${patient.guardianWhatsapp.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-mono text-[11px] font-semibold text-[#059669] hover:underline"
                 >
-                  <Syringe className="w-3.5 h-3.5 text-[#059669]" />
-                  <span>Vacunas</span>
+                  <Phone className="w-3 h-3" />
+                  {patient.guardianWhatsapp}
+                </a>
+              </div>
+            ),
+          },
+          {
+            key: 'alerts',
+            header: 'Alertas',
+            render: (patient) =>
+              patient.criticalAllergies.length > 0 ? (
+                <StatusBadge label={patient.criticalAllergies[0]} variant="danger" />
+              ) : (
+                <StatusBadge label="Sin alergias" variant="neutral" />
+              ),
+          },
+          {
+            key: 'actions',
+            header: 'Acciones',
+            render: (patient) => (
+              <div className="flex flex-wrap items-center gap-2">
+                {patient.primarySpecialty === 'Pediatría' && (
+                  <button
+                    onClick={() => navigateToPatientVaccines(patient.id)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Syringe className="w-3.5 h-3.5 text-[#059669]" />
+                    <span>Vacunas</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => navigateToPatient360(patient.id)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#0284C7]" />
+                  <span>Expediente</span>
                 </button>
-              )}
-
-              <button
-                onClick={() => navigateToPatient360(patient.id)}
-                className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer"
-              >
-                <FileText className="w-3.5 h-3.5 text-[#0284C7]" />
-                <span>Ver Expediente</span>
-              </button>
-
-              <button
-                onClick={() => navigateToActiveConsultation(patient.id)}
-                className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <Stethoscope className="w-3.5 h-3.5" />
-                <span>Iniciar Consulta Ahora</span>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+                <button
+                  onClick={() => navigateToActiveConsultation(patient.id)}
+                  className="px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>Consulta</span>
+                </button>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 };
@@ -194,12 +195,41 @@ export const Patient360View: React.FC = () => {
     navigateToActiveConsultation,
     navigateToPatientVaccines,
     openDispatchModal,
+    activeDoctorSpecialty,
+    setActiveDoctorSpecialty,
+    saveSpecialtyRecord,
+    grantDiagnosisPermission,
+    revokeDiagnosisPermission,
+    canViewConsultationDiagnosis,
   } = useMedical();
 
   const [activeTab, setActiveTab] = useState<'timeline' | 'perinatal' | 'curvas' | 'estudios'>(
     'timeline'
   );
   const [growthMetric, setGrowthMetric] = useState<'weight' | 'height' | 'bmi'>('weight');
+  const [filterBySpecialty, setFilterBySpecialty] = useState<boolean>(false);
+  const [showReferralPanel, setShowReferralPanel] = useState<boolean>(false);
+  const [referralTargetSpecialty, setReferralTargetSpecialty] = useState<Specialty>(
+    'Medicina Interna / Cardiología'
+  );
+  const [referralConsultationId, setReferralConsultationId] = useState<string>('ALL');
+  const [referralReason, setReferralReason] = useState<string>('');
+
+  const specialtyConfig = getSpecialtyConfig(activeDoctorSpecialty);
+  const existingSpecialtyData = selectedPatient.specialtyRecords?.[activeDoctorSpecialty] || {};
+  const [specialtyForm, setSpecialtyForm] = useState<Record<string, string>>(existingSpecialtyData);
+
+  React.useEffect(() => {
+    setSpecialtyForm(selectedPatient.specialtyRecords?.[activeDoctorSpecialty] || {});
+    if (activeTab === 'curvas' && !specialtyConfig.supportsGrowthCurve) {
+      setActiveTab('timeline');
+    }
+  }, [selectedPatient.id, activeDoctorSpecialty, specialtyConfig.supportsGrowthCurve]);
+
+  const filteredConsultations = useMemo(() => {
+    if (!filterBySpecialty) return selectedPatient.consultations;
+    return selectedPatient.consultations.filter((c) => c.specialty === activeDoctorSpecialty);
+  }, [selectedPatient.consultations, filterBySpecialty, activeDoctorSpecialty]);
 
   return (
     <div className="space-y-5">
@@ -237,6 +267,21 @@ export const Patient360View: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-500">Especialidad:</span>
+              <select
+                value={activeDoctorSpecialty}
+                onChange={(e) => setActiveDoctorSpecialty(e.target.value as Specialty)}
+                className="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
+              >
+                {(Object.keys(SPECIALTY_REGISTRY) as Specialty[]).map((spec) => (
+                  <option key={spec} value={spec}>
+                    {spec}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {selectedPatient.criticalAllergies.length > 0 && (
               <div className="px-4 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[#E11D48] text-xs font-bold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -244,20 +289,22 @@ export const Patient360View: React.FC = () => {
               </div>
             )}
 
-            <button
-              onClick={() => navigateToPatientVaccines(selectedPatient.id)}
-              className="px-3.5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-2 cursor-pointer"
-            >
-              <Syringe className="w-4 h-4 text-[#059669]" />
-              <span>Carnet de Vacunas (Vista 13)</span>
-            </button>
+            {specialtyConfig.supportsPediatricVaccines && (
+              <button
+                onClick={() => navigateToPatientVaccines(selectedPatient.id)}
+                className="px-3.5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-2 cursor-pointer"
+              >
+                <Syringe className="w-4 h-4 text-[#059669]" />
+                <span>Carnet de Vacunas (Vista 13)</span>
+              </button>
+            )}
 
             <button
               onClick={() => navigateToActiveConsultation(selectedPatient.id)}
               className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
             >
               <Stethoscope className="w-4 h-4" />
-              <span>Iniciar Consulta Ahora</span>
+              <span>Iniciar Consulta ({specialtyConfig.code})</span>
             </button>
           </div>
         </div>
@@ -265,11 +312,25 @@ export const Patient360View: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200/70">
           {[
-            { id: 'timeline', label: 'Línea de Tiempo (Timeline Clínico)', icon: Clock },
-            { id: 'perinatal', label: 'Ficha Perinatal / Antecedentes', icon: Baby },
-            { id: 'curvas', label: 'Curvas de Crecimiento OMS', icon: TrendingUp },
-            { id: 'estudios', label: 'Archivos y Estudios Diagnósticos', icon: FolderOpen },
-          ].map((t) => {
+            { id: 'timeline', label: 'Línea de Tiempo (Timeline Clínico)', icon: Clock, visible: true },
+            {
+              id: 'perinatal',
+              label: specialtyConfig.supportsPerinatal
+                ? 'Ficha Perinatal / Antecedentes'
+                : `Ficha Clínica · ${activeDoctorSpecialty}`,
+              icon: Baby,
+              visible: true,
+            },
+            {
+              id: 'curvas',
+              label: 'Curvas de Crecimiento OMS',
+              icon: TrendingUp,
+              visible: specialtyConfig.supportsGrowthCurve,
+            },
+            { id: 'estudios', label: 'Archivos y Estudios Diagnósticos', icon: FolderOpen, visible: true },
+          ]
+            .filter((t) => t.visible)
+            .map((t) => {
             const Icon = t.icon;
             const active = activeTab === t.id;
             return (
@@ -293,11 +354,171 @@ export const Patient360View: React.FC = () => {
       {/* TAB 1: TIMELINE CRONOLÓGICO */}
       {activeTab === 'timeline' && (
         <div className="space-y-4">
-          {selectedPatient.consultations.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl border border-slate-200/80 px-4 py-2.5">
+            <span className="text-xs font-semibold text-slate-600">
+              Historial de consultas ({filteredConsultations.length})
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReferralPanel((v) => !v)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1.5 hover:bg-emerald-100 cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Referir / Permiso de Diagnóstico</span>
+              </button>
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setFilterBySpecialty(false)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer ${
+                    !filterBySpecialty ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  Todas las especialidades
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterBySpecialty(true)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold cursor-pointer ${
+                    filterBySpecialty ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  Solo {activeDoctorSpecialty}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {showReferralPanel && (
+            <div className="bg-white rounded-2xl border border-emerald-200 p-5 shadow-xs space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Autorizar Acceso a Diagnósticos para Especialista</span>
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Cuando refieres al paciente a un especialista, puedes darle permiso para ver tus diagnósticos. Los exámenes realizados siempre son visibles sin permiso.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowReferralPanel(false)}
+                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  grantDiagnosisPermission(selectedPatient.id, {
+                    consultationId: referralConsultationId === 'ALL' ? undefined : referralConsultationId,
+                    targetSpecialty: referralTargetSpecialty,
+                    reason: referralReason || `Referencia desde ${activeDoctorSpecialty}`,
+                  });
+                  setReferralReason('');
+                }}
+                className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
+              >
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Especialista Destino
+                  </label>
+                  <select
+                    value={referralTargetSpecialty}
+                    onChange={(e) => setReferralTargetSpecialty(e.target.value as Specialty)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                  >
+                    {(Object.keys(SPECIALTY_REGISTRY) as Specialty[])
+                      .filter((s) => s !== activeDoctorSpecialty)
+                      .map((spec) => (
+                        <option key={spec} value={spec}>
+                          {spec}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Alcance del Permiso
+                  </label>
+                  <select
+                    value={referralConsultationId}
+                    onChange={(e) => setReferralConsultationId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white"
+                  >
+                    <option value="ALL">Todos mis diagnósticos del paciente</option>
+                    {selectedPatient.consultations.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.date} · {c.cie10Code} ({c.specialty})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-1">
+                    Motivo de Referencia
+                  </label>
+                  <input
+                    type="text"
+                    value={referralReason}
+                    onChange={(e) => setReferralReason(e.target.value)}
+                    placeholder="Ej. Evaluación por soplo / exámenes alterados"
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                >
+                  Otorgar Permiso
+                </button>
+              </form>
+
+              {(selectedPatient.diagnosisPermissions || []).some((p) => p.active) && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase">
+                    Permisos Activos Otorgados
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {(selectedPatient.diagnosisPermissions || [])
+                      .filter((p) => p.active)
+                      .map((perm) => (
+                        <div
+                          key={perm.id}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800"
+                        >
+                          <span>
+                            <strong>{perm.grantedBySpecialty}</strong> → <strong>{perm.targetSpecialty}</strong>
+                            {perm.reason ? ` (${perm.reason})` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => revokeDiagnosisPermission(selectedPatient.id, perm.id)}
+                            className="text-rose-600 hover:text-rose-800 font-bold cursor-pointer"
+                            title="Revocar permiso"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {filteredConsultations.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center space-y-3">
               <FileText className="w-8 h-8 text-slate-400 mx-auto" />
               <h3 className="text-sm font-bold text-slate-900">
-                Sin consultas históricas registradas aún
+                Sin consultas históricas registradas aún{filterBySpecialty ? ` en ${activeDoctorSpecialty}` : ''}
               </h3>
               <p className="text-xs text-slate-500">
                 Inicie una consulta con el Copiloto de IA para poblar el historial cronológico.
@@ -310,89 +531,175 @@ export const Patient360View: React.FC = () => {
               </button>
             </div>
           ) : (
-            selectedPatient.consultations.map((cons) => (
-              <div
-                key={cons.id}
-                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs font-bold text-[#0284C7]">{cons.date}</span>
-                    <span className="text-xs text-slate-400">·</span>
-                    <span className="text-xs font-bold text-slate-900">
-                      {cons.cie10Code} — {cons.cie10Name}
-                    </span>
-                    <span className="text-xs text-slate-400">·</span>
-                    <span className="text-xs text-slate-500">{cons.doctorName}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-mono text-slate-600">
-                    <span>Peso: {cons.weightKg} kg</span>
-                    <span>Talla: {cons.heightCm} cm</span>
-                    <span>T: {cons.temperatureC} °C</span>
-                    <button
-                      onClick={() => openDispatchModal(selectedPatient, cons)}
-                      className="px-3 py-1 rounded-lg bg-sky-50 text-[#0284C7] font-sans font-semibold hover:bg-sky-100 cursor-pointer"
-                    >
-                      Ver Récipe PDF (Vista 17)
-                    </button>
-                  </div>
-                </div>
+            filteredConsultations.map((cons) => {
+              const hasAccess = canViewConsultationDiagnosis(
+                selectedPatient,
+                cons,
+                activeDoctorSpecialty
+              );
 
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  <strong>Motivo y Evolución:</strong> {cons.reason}
-                </p>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>Examen Físico:</strong> {cons.physicalExamSummary}
-                </p>
-              </div>
-            ))
+              if (!hasAccess) {
+                return (
+                  <div
+                    key={cons.id}
+                    className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-5 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Lock className="w-4 h-4 text-amber-600" />
+                        <span className="font-mono font-bold text-slate-700">{cons.date}</span>
+                        <span className="text-slate-400">·</span>
+                        <span className="font-bold text-slate-800">
+                          Diagnóstico Protegido ({cons.specialty})
+                        </span>
+                        <span className="text-slate-400">·</span>
+                        <span className="text-slate-500">{cons.doctorName}</span>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
+                        Requiere permiso del médico remitente
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      La especialidad activa (<strong>{activeDoctorSpecialty}</strong>) aún no tiene permiso para ver este diagnóstico. Puedes revisar los exámenes del paciente en la pestaña de Estudios sin permiso.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={cons.id}
+                  className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-bold text-[#0284C7]">{cons.date}</span>
+                      <span className="text-xs text-slate-400">·</span>
+                      <span className="text-xs font-bold text-slate-900">
+                        {cons.cie10Code} — {cons.cie10Name}
+                      </span>
+                      <span className="text-xs text-slate-400">·</span>
+                      <span className="text-xs text-slate-500">
+                        {cons.doctorName} ({cons.specialty})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-mono text-slate-600">
+                      <span>Peso: {cons.weightKg} kg</span>
+                      <span>Talla: {cons.heightCm} cm</span>
+                      <span>T: {cons.temperatureC} °C</span>
+                      <button
+                        onClick={() => openDispatchModal(selectedPatient, cons)}
+                        className="px-3 py-1 rounded-lg bg-sky-50 text-[#0284C7] font-sans font-semibold hover:bg-sky-100 cursor-pointer"
+                      >
+                        Ver Récipe PDF (Vista 17)
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    <strong>Motivo y Evolución:</strong> {cons.reason}
+                  </p>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    <strong>Examen Físico:</strong> {cons.physicalExamSummary}
+                  </p>
+                </div>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* TAB 2: FICHA PERINATAL Y ANTECEDENTES */}
+      {/* TAB 2: FICHA PERINATAL / ANTECEDENTES POR ESPECIALIDAD */}
       {activeTab === 'perinatal' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
-          <h2 className="text-sm font-bold text-slate-900">
-            Datos Perinatales, Neonatales y Antecedentes Patológicos
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
-              <span className="text-[11px] text-slate-500 block">Edad Gestacional</span>
-              <span className="text-base font-bold font-mono text-slate-900">
-                {selectedPatient.perinatal.gestationalWeeks} semanas
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
-              <span className="text-[11px] text-slate-500 block">Test de Apgar (1&apos; / 5&apos;)</span>
-              <span className="text-base font-bold font-mono text-[#059669]">
-                {selectedPatient.perinatal.apgar1Min} pts / {selectedPatient.perinatal.apgar5Min} pts
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
-              <span className="text-[11px] text-slate-500 block">Peso y Talla al Nacer</span>
-              <span className="text-base font-bold font-mono text-slate-900">
-                {selectedPatient.perinatal.birthWeightKg} kg · {selectedPatient.perinatal.birthHeightCm} cm
-              </span>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
-              <span className="text-[11px] text-slate-500 block">Vía de Nacimiento</span>
-              <span className="text-xs font-bold text-slate-900">
-                {selectedPatient.perinatal.deliveryType}
-              </span>
-            </div>
-          </div>
+          {specialtyConfig.supportsPerinatal ? (
+            <>
+              <h2 className="text-sm font-bold text-slate-900">
+                Datos Perinatales, Neonatales y Antecedentes Patológicos
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span className="text-[11px] text-slate-500 block">Edad Gestacional</span>
+                  <span className="text-base font-bold font-mono text-slate-900">
+                    {selectedPatient.perinatal.gestationalWeeks} semanas
+                  </span>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span className="text-[11px] text-slate-500 block">Test de Apgar (1&apos; / 5&apos;)</span>
+                  <span className="text-base font-bold font-mono text-[#059669]">
+                    {selectedPatient.perinatal.apgar1Min} pts / {selectedPatient.perinatal.apgar5Min} pts
+                  </span>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span className="text-[11px] text-slate-500 block">Peso y Talla al Nacer</span>
+                  <span className="text-base font-bold font-mono text-slate-900">
+                    {selectedPatient.perinatal.birthWeightKg} kg · {selectedPatient.perinatal.birthHeightCm} cm
+                  </span>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70">
+                  <span className="text-[11px] text-slate-500 block">Vía de Nacimiento</span>
+                  <span className="text-xs font-bold text-slate-900">
+                    {selectedPatient.perinatal.deliveryType}
+                  </span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-4 rounded-xl border border-slate-200 space-y-1">
-              <div className="font-bold text-slate-900">Complicaciones Neonatales y Pesquisa</div>
-              <p className="text-slate-600">{selectedPatient.perinatal.neonatalComplications}</p>
-            </div>
-            <div className="p-4 rounded-xl border border-slate-200 space-y-1">
-              <div className="font-bold text-slate-900">Hospitalizaciones y Condiciones Crónicas</div>
-              <p className="text-slate-600">{selectedPatient.previousHospitalizations}</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="p-4 rounded-xl border border-slate-200 space-y-1">
+                  <div className="font-bold text-slate-900">Complicaciones Neonatales y Pesquisa</div>
+                  <p className="text-slate-600">{selectedPatient.perinatal.neonatalComplications}</p>
+                </div>
+                <div className="p-4 rounded-xl border border-slate-200 space-y-1">
+                  <div className="font-bold text-slate-900">Hospitalizaciones y Condiciones Crónicas</div>
+                  <p className="text-slate-600">{selectedPatient.previousHospitalizations}</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveSpecialtyRecord(selectedPatient.id, activeDoctorSpecialty, specialtyForm);
+              }}
+              className="space-y-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Ficha Clínica Especializada · {activeDoctorSpecialty}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Antecedentes y parámetros propios de la especialidad médica activa.
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+                >
+                  Guardar Ficha de {activeDoctorSpecialty}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {specialtyConfig.recordFields.map((field) => (
+                  <div key={field.key} className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      {field.label}
+                    </label>
+                    <input
+                      type="text"
+                      value={specialtyForm[field.key] || ''}
+                      onChange={(e) =>
+                        setSpecialtyForm((prev) => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                      placeholder={field.placeholder}
+                      className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </form>
+          )}
         </div>
       )}
 
@@ -508,7 +815,14 @@ export const Patient360View: React.FC = () => {
 
       {/* TAB 4: ARCHIVOS Y ESTUDIOS */}
       {activeTab === 'estudios' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <div className="bg-sky-50 border border-sky-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-sky-800">
+            <ShieldCheck className="w-4 h-4 text-[#0284C7] shrink-0" />
+            <span>
+              <strong>Acceso libre a exámenes:</strong> Los estudios de laboratorio e imagenología realizados al paciente están disponibles para cualquier especialista sin requerir permisos adicionales.
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {selectedPatient.studies.map((study) => (
             <div
               key={study.id}
@@ -537,6 +851,7 @@ export const Patient360View: React.FC = () => {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
     </div>

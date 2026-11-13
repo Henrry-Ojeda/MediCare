@@ -25,7 +25,8 @@ import {
   calculatePediatricDose,
   DEMO_DICTATION_SCRIPTS,
 } from '../data/mockClinicalData';
-import { PrescriptionItem } from '../types/medical';
+import { PrescriptionItem, Specialty } from '../types/medical';
+import { SPECIALTY_REGISTRY } from '../config/specialties';
 
 export const ActiveConsultationView: React.FC = () => {
   const {
@@ -35,6 +36,8 @@ export const ActiveConsultationView: React.FC = () => {
     completeConsultation,
     incrementAiUsage,
     showToast,
+    activeDoctorSpecialty,
+    setActiveDoctorSpecialty,
   } = useMedical();
 
   // --- AI Copilot Recording & Processing State ---
@@ -204,7 +207,7 @@ export const ActiveConsultationView: React.FC = () => {
           patientName: `${selectedPatient.firstName} ${selectedPatient.lastName}`,
           patientAge: calculateExactAgeLabel(selectedPatient.birthDate),
           weightKg,
-          specialty: selectedPatient.primarySpecialty,
+          specialty: activeDoctorSpecialty,
         }),
       });
 
@@ -345,7 +348,7 @@ export const ActiveConsultationView: React.FC = () => {
     const summaryObj = {
       id: `cons-${Date.now()}`,
       date: '2026-11-09',
-      specialty: selectedPatient.primarySpecialty,
+      specialty: activeDoctorSpecialty,
       doctorName: 'Dra. Valeria Méndez',
       reason: motivoConsulta,
       cie10Code: selectedCie10.code,
@@ -414,7 +417,19 @@ export const ActiveConsultationView: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={activeDoctorSpecialty}
+              onChange={(e) => setActiveDoctorSpecialty(e.target.value as Specialty)}
+              className="px-3 py-2 text-xs font-bold bg-sky-50 border border-sky-200 rounded-xl text-[#0284C7] cursor-pointer"
+              title="Especialidad del médico en esta consulta"
+            >
+              {(Object.keys(SPECIALTY_REGISTRY) as Specialty[]).map((spec) => (
+                <option key={spec} value={spec}>
+                  Especialidad: {spec}
+                </option>
+              ))}
+            </select>
             <UserCheck className="w-4 h-4 text-slate-400" />
             <select
               value={selectedPatient.id}

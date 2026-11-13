@@ -23,8 +23,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMedical } from '../../context/MedicalContext';
-import { ViewId } from '../../types/medical';
+import { Specialty, ViewId } from '../../types/medical';
 import { ASSETS } from '../../data/mockClinicalData';
+import { SPECIALTY_REGISTRY, getSpecialtyConfig } from '../../config/specialties';
 
 export const ALL_24_VIEWS_CATALOG: {
   number: number;
@@ -65,6 +66,8 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     currentView,
     setCurrentView,
     setIsAuthenticated,
+    currentUser,
+    logout,
     selectedPatient,
     appointments,
     tenantConfig,
@@ -72,7 +75,17 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     openVaccineModal,
     openDispatchModal,
     toastMessage,
+    activeDoctorSpecialty,
+    setActiveDoctorSpecialty,
+    doctors,
+    isAssistant,
+    isAdmin,
+    activeAssistantProfile,
+    activeManagedDoctorId,
+    setActiveManagedDoctorId,
   } = useMedical();
+
+  const specialtyConfig = getSpecialtyConfig(activeDoctorSpecialty);
 
   const [showViewExplorer, setShowViewExplorer] = useState(false);
 
@@ -246,6 +259,37 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
     },
   ];
 
+  const assistantAllowedViews: ViewId[] = activeAssistantProfile?.allowedViews || [
+    'agenda',
+    'sala-espera',
+    'pacientes',
+    'paciente-nuevo',
+    'caja',
+    'perfil',
+  ];
+
+  const visibleSidebarSections = isAssistant
+    ? sidebarSections
+        .map((section) => ({
+          ...section,
+          items: section.items.filter(
+            (item) => assistantAllowedViews.includes(item.id) || item.id === 'perfil'
+          ),
+        }))
+        .filter((section) => section.items.length > 0)
+    : isAdmin
+      ? sidebarSections
+          .map((section) => ({
+            ...section,
+            items: section.items.filter((item) => item.id !== 'consulta-activa'),
+          }))
+          .filter((section) => section.items.length > 0)
+      : sidebarSections;
+
+  const isViewBlockedForAssistant =
+    isAssistant && currentView !== 'perfil' && !assistantAllowedViews.includes(currentView);
+  const isViewBlockedForAdmin = isAdmin && currentView === 'consulta-activa';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex">
       {/* Sidebar Navigation (264px fixed desktop width) */}
@@ -264,18 +308,20 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
                 MedCore AI
               </span>
             </button>
-            <button
-              onClick={() => setShowViewExplorer(true)}
-              title="Explorar las 24 vistas del sistema"
-              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-semibold transition-colors cursor-pointer"
-            >
-              {currentViewMeta.number}/24
-            </button>
+            {!isAssistant && (
+              <button
+                onClick={() => setShowViewExplorer(true)}
+                title="Explorar las 24 vistas del sistema"
+                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-semibold transition-colors cursor-pointer"
+              >
+                {currentViewMeta.number}/24
+              </button>
+            )}
           </div>
 
           {/* Navigation Groups */}
           <div className="p-3 space-y-5 overflow-y-auto max-h-[calc(100vh-148px)]">
-            {sidebarSections.map((group) => (
+            {visibleSidebarSections.map((group) => (
               <div key={group.label}>
                 <div className="px-3 mb-1.5 text-[11px] font-semibold text-slate-400 tracking-tight">
                   {group.label}
@@ -332,15 +378,33 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
                 className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
               />
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-900 truncate">Dra. Valeria Méndez</p>
-                <p className="text-[11px] text-slate-500 truncate">Pediatría · MPPS 68412</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-slate-900 truncate">
+                    {currentUser?.name || 'Dra. Valeria Méndez'}
+                  </p>
+                  {(currentUser?.esSuperAdmin || currentUser?.roleCode === 'SUPERADMIN') && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-amber-100 text-amber-800 shrink-0">
+                      SUPERADMIN
+                    </span>
+                  )}
+                  {!currentUser?.esSuperAdmin && currentUser?.roleCode === 'ADMIN' && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-sky-100 text-sky-800 shrink-0">
+                      ADMIN
+                    </span>
+                  )}
+                  {currentUser?.roleCode === 'ASISTENTE' && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-800 shrink-0">
+                      ASISTENTE
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {currentUser?.roleName || `${activeDoctorSpecialty} · MPPS 68412`}
+                </p>
               </div>
             </button>
             <button
-              onClick={() => {
-                setIsAuthenticated(false);
-                setCurrentView('login');
-              }}
+              onClick={logout}
               title="Cerrar sesión (Ir a Vista 1 Login)"
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
             >
@@ -365,46 +429,154 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
           {/* Zone 2: Concise single-line navigation links */}
           <nav className="hidden xl:flex items-center gap-6 text-xs font-medium text-slate-600">
-            <button
-              onClick={() => setShowViewExplorer(true)}
-              className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Explorar 24 Vistas
-            </button>
-            <button
-              onClick={() => setCurrentView('sala-espera')}
-              className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Sala de Espera ({appointments.filter((a) => a.stage !== 'completado').length})
-            </button>
-            <button
-              onClick={() => setCurrentView('paciente-detalle')}
-              className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              Paciente: {selectedPatient.firstName}
-            </button>
-            <button
-              onClick={() => setCurrentView('caja')}
-              className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 font-mono tabular-nums cursor-pointer"
-            >
-              BCV: Bs. {tenantConfig.bcvRate.toFixed(2)}
-            </button>
+            {!isAssistant && (
+              <button
+                onClick={() => setShowViewExplorer(true)}
+                className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Explorar 24 Vistas
+              </button>
+            )}
+            {(!isAssistant || assistantAllowedViews.includes('sala-espera')) && (
+              <button
+                onClick={() => setCurrentView('sala-espera')}
+                className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Sala de Espera ({appointments.filter((a) => a.stage !== 'completado').length})
+              </button>
+            )}
+            {(!isAssistant || assistantAllowedViews.includes('paciente-detalle')) && (
+              <button
+                onClick={() => setCurrentView('paciente-detalle')}
+                className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                Paciente: {selectedPatient.firstName}
+              </button>
+            )}
+            {(!isAssistant || assistantAllowedViews.includes('caja')) && (
+              <button
+                onClick={() => setCurrentView('caja')}
+                className="hover:text-[#0284C7] transition-colors whitespace-nowrap shrink-0 font-mono tabular-nums cursor-pointer"
+              >
+                BCV: Bs. {tenantConfig.bcvRate.toFixed(2)}
+              </button>
+            )}
           </nav>
 
-          {/* Zone 3: 1 Primary Action Button */}
+          {/* Zone 3: Global Specialty / Managed Doctor Context + 1 Primary Action Button */}
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => setCurrentView('consulta-activa')}
-              className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold flex items-center gap-2 shadow-xs hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0 cursor-pointer"
-            >
-              <Stethoscope className="w-3.5 h-3.5" />
-              <span>Puesto de Consulta IA</span>
-            </button>
+            {isAssistant ? (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-violet-50 border border-violet-200">
+                <span className="text-[11px] font-bold text-violet-700">Médico:</span>
+                <select
+                  value={activeManagedDoctorId}
+                  onChange={(e) => setActiveManagedDoctorId(e.target.value)}
+                  aria-label="Médico gestionado por la asistente"
+                  className="text-xs font-semibold text-violet-950 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">
+                    Todos mis médicos ({activeAssistantProfile?.assignedDoctorIds.length ?? doctors.length})
+                  </option>
+                  {doctors
+                    .filter(
+                      (doc) =>
+                        !activeAssistantProfile ||
+                        activeAssistantProfile.assignedDoctorIds.includes(doc.id)
+                    )
+                    .map((doc) => (
+                      <option key={doc.id} value={doc.id}>
+                        {doc.name} ({doc.specialty})
+                      </option>
+                    ))}
+                </select>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: specialtyConfig.accentColor }}
+                />
+                <select
+                  value={activeDoctorSpecialty}
+                  onChange={(e) => setActiveDoctorSpecialty(e.target.value as Specialty)}
+                  aria-label="Especialidad activa del médico"
+                  className="text-xs font-semibold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  {(Object.keys(SPECIALTY_REGISTRY) as Specialty[]).map((spec) => (
+                    <option key={spec} value={spec}>
+                      {spec}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {isAssistant ? (
+              <button
+                onClick={() => setCurrentView('agenda')}
+                className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-semibold flex items-center gap-2 shadow-xs hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Mi Agenda</span>
+              </button>
+            ) : isAdmin ? (
+              <button
+                onClick={() => setCurrentView('reportes')}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 shadow-xs hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Dashboard Gerencial</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setCurrentView('consulta-activa')}
+                className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold flex items-center gap-2 shadow-xs hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <Stethoscope className="w-3.5 h-3.5" />
+                <span>Puesto de Consulta IA</span>
+              </button>
+            )}
           </div>
         </header>
 
         {/* Active View Viewport */}
-        <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+        <main className="flex-1 p-6 overflow-y-auto">
+          {isViewBlockedForAssistant ? (
+            <div className="max-w-lg mx-auto mt-12 bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-xs">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">Vista Restringida para Asistente</h2>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Esta sección es exclusiva del médico o requiere autorización explícita en{' '}
+                <strong>Configuración → Asistentes</strong> (ej. Consulta Activa + IA y Epidemiología CIE-10 no están habilitadas para asistentes).
+              </p>
+              <button
+                onClick={() => setCurrentView('agenda')}
+                className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+              >
+                Volver a Mi Agenda
+              </button>
+            </div>
+          ) : isViewBlockedForAdmin ? (
+            <div className="max-w-lg mx-auto mt-12 bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-xs">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h2 className="text-lg font-bold text-slate-900">Acto Médico Exclusivo del Doctor</h2>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                El rol <strong>ADMIN</strong> gestiona finanzas, reportes, configuración y personal, pero no puede iniciar consultas médicas ni agendar sin autorización del doctor.
+              </p>
+              <button
+                onClick={() => setCurrentView('reportes')}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
+              >
+                Ir al Dashboard Gerencial
+              </button>
+            </div>
+          ) : (
+            children
+          )}
+        </main>
       </div>
 
       {/* Toast Notification */}

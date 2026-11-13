@@ -12,6 +12,12 @@ import {
   VaccineDoseRecord,
   PastConsultationSummary,
   WaitingRoomStage,
+  Specialty,
+  DiagnosisPermission,
+  DoctorProfile,
+  AssistantAssignment,
+  AssistantPermissions,
+  AdminAgendaPermissionRequest,
 } from '../types/medical';
 import {
   INITIAL_PATIENTS,
@@ -22,12 +28,27 @@ import {
   INITIAL_TEMPLATE_CONFIG,
   INITIAL_TENANT_CONFIG,
 } from '../data/mockClinicalData';
+import { medicareApi } from '../api/medicareApi';
+import { getAuthToken } from '../api/client';
+
+export interface AuthUser {
+  id: string;
+  username?: string;
+  name: string;
+  email: string;
+  roleCode: string;
+  roleName: string;
+  esSuperAdmin?: boolean;
+}
 
 interface MedicalContextValue {
   currentView: ViewId;
   setCurrentView: (view: ViewId) => void;
   isAuthenticated: boolean;
   setIsAuthenticated: (val: boolean) => void;
+  currentUser: AuthUser | null;
+  setCurrentUser: (user: AuthUser | null) => void;
+  logout: () => void;
   selectedPatientId: string;
   setSelectedPatientId: (id: string) => void;
   selectedPatient: Patient;
@@ -76,6 +97,48 @@ interface MedicalContextValue {
   updateTemplateConfig: (partial: Partial<RecipeTemplateConfig>) => void;
   updateTenantConfig: (partial: Partial<ClinicTenantConfig>) => void;
   logAuditEvent: (entry: Omit<AuditLogEntry, 'id' | 'timestamp' | 'ipAddress'>) => void;
+  activeDoctorSpecialty: Specialty;
+  setActiveDoctorSpecialty: (specialty: Specialty) => void;
+  saveSpecialtyRecord: (patientId: string, specialty: Specialty, data: Record<string, string>) => void;
+  grantDiagnosisPermission: (
+    patientId: string,
+    payload: {
+      consultationId?: string;
+      targetSpecialty: Specialty;
+      reason: string;
+      grantedByDoctor?: string;
+    }
+  ) => void;
+  revokeDiagnosisPermission: (patientId: string, permissionId: string) => void;
+  canViewConsultationDiagnosis: (
+    patient: Patient,
+    consultation: PastConsultationSummary,
+    viewerSpecialty: Specialty
+  ) => boolean;
+
+  // Asistentes Personales y Compartidas (Clínica)
+  doctors: DoctorProfile[];
+  assistants: AssistantAssignment[];
+  isAssistant: boolean;
+  isAdmin: boolean;
+  activeAssistantProfile: AssistantAssignment | null;
+  activeManagedDoctorId: string;
+  setActiveManagedDoctorId: (doctorId: string) => void;
+  saveAssistantAssignment: (assignment: Omit<AssistantAssignment, 'id'> & { id?: string }) => void;
+  toggleAssistantPermission: (assistantId: string, key: keyof AssistantPermissions) => void;
+  toggleAssistantViewPermission: (assistantId: string, viewId: ViewId) => void;
+  removeAssistantAssignment: (assistantId: string) => void;
+  adminAgendaRequests: AdminAgendaPermissionRequest[];
+  requestAdminAgendaPermission: (doctorId: string, reason: string) => void;
+  resolveAdminAgendaPermission: (requestId: string, approved: boolean) => void;
+  canAdminScheduleForDoctor: (doctorId: string) => boolean;
+  rescheduleAppointment: (
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+    doctorId?: string,
+    reason?: string
+  ) => void;
 
   // SaaS usage metrics (Vista 24)
   aiMinutesUsed: number;
@@ -89,6 +152,7 @@ interface MedicalContextValue {
 const MedicalContext = createContext<MedicalContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'medcore_ai_saas_state_v1';
+const USER_STORAGE_KEY = 'medicare_current_user';
 
 export function calculateExactAgeLabel(birthDateStr: string): string {
   const birth = new Date(birthDateStr);
@@ -113,11 +177,131 @@ export function calculateAgeInMonths(birthDateStr: string): number {
   return Math.max(0, (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth()));
 }
 
+const INITIAL_DOCTORS: DoctorProfile[] = [
+  { id: 'doc-1', name: 'Dra. Valeria Méndez', specialty: 'Pediatría', licenseNumber: 'MPPS 68412' },
+  { id: 'doc-2', name: 'Dr. Carlos Mendoza', specialty: 'Medicina Interna / Cardiología', licenseNumber: 'MPPS 71204' },
+  { id: 'doc-3', name: 'Dra. Sofía Rojas', specialty: 'Medicina General', licenseNumber: 'MPPS 64980' },
+  { id: 'doc-4', name: 'Dr. Andrés Navarro', specialty: 'Ginecología', licenseNumber: 'MPPS 73015' },
+];
+
+const INITIAL_ASSISTANTS: AssistantAssignment[] = [
+  {
+    id: 'asist-1',
+    assistantName: 'Laura Pérez',
+    assistantUsername: 'laura.asistente',
+    assistantEmail: 'laura.perez@medcoresalud.com',
+    mode: 'PERSONAL',
+    assignedDoctorIds: ['doc-1'],
+    permissions: {
+      canSchedule: true,
+      canRegisterPatientInfo: true,
+      canCollectPayments: true,
+      canRescheduleOrCancel: true,
+    },
+    allowedViews: ['agenda', 'sala-espera', 'pacientes', 'paciente-nuevo', 'caja', 'caja-recibos', 'perfil'],
+    active: true,
+  },
+  {
+    id: 'asist-2',
+    assistantName: 'Mariana Gómez (Coordinación Clínica)',
+    assistantUsername: 'mariana.clinica',
+    assistantEmail: 'mariana.gomez@medcoresalud.com',
+    mode: 'COMPARTIDA_CLINICA',
+    assignedDoctorIds: ['doc-1', 'doc-2', 'doc-3'],
+    permissions: {
+      canSchedule: true,
+      canRegisterPatientInfo: true,
+      canCollectPayments: true,
+      canRescheduleOrCancel: true,
+    },
+    allowedViews: ['agenda', 'sala-espera', 'pacientes', 'paciente-nuevo', 'caja', 'caja-recibos', 'perfil'],
+    active: true,
+  },
+];
+
 export const MedicalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // User requested to start on Login view (/login) and follow the full flow
-  const [currentView, setCurrentView] = useState<ViewId>('login');
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUser, setCurrentUserState] = useState<AuthUser | null>(() => {
+    try {
+      const token = getAuthToken();
+      const raw = localStorage.getItem(USER_STORAGE_KEY);
+      if (token && raw) return JSON.parse(raw) as AuthUser;
+    } catch {
+      // ignore storage errors
+    }
+    return null;
+  });
+
+  const [currentView, setCurrentView] = useState<ViewId>(() =>
+    getAuthToken() && localStorage.getItem(USER_STORAGE_KEY) ? 'consulta-activa' : 'login'
+  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() =>
+    Boolean(getAuthToken() && localStorage.getItem(USER_STORAGE_KEY))
+  );
+
+  const setCurrentUser = (user: AuthUser | null) => {
+    setCurrentUserState(user);
+    try {
+      if (user) {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      } else {
+        localStorage.removeItem(USER_STORAGE_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const logout = () => {
+    medicareApi.logout();
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setCurrentView('login');
+  };
   const [selectedPatientId, setSelectedPatientId] = useState<string>('pat-1');
+  const [activeDoctorSpecialty, setActiveDoctorSpecialty] = useState<Specialty>('Pediatría');
+  const [doctors] = useState<DoctorProfile[]>(INITIAL_DOCTORS);
+  const [activeManagedDoctorId, setActiveManagedDoctorId] = useState<string>('ALL');
+  const [assistants, setAssistants] = useState<AssistantAssignment[]>(() => {
+    try {
+      const saved = localStorage.getItem('medicare_assistants_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_ASSISTANTS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('medicare_assistants_v1', JSON.stringify(assistants));
+    } catch {
+      // ignore
+    }
+  }, [assistants]);
+
+  const [adminAgendaRequests, setAdminAgendaRequests] = useState<AdminAgendaPermissionRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('medicare_admin_agenda_requests_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('medicare_admin_agenda_requests_v1', JSON.stringify(adminAgendaRequests));
+    } catch {
+      // ignore
+    }
+  }, [adminAgendaRequests]);
 
   const [patients, setPatients] = useState<Patient[]>(() => {
     try {
@@ -437,6 +621,232 @@ export const MedicalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setWhatsappMessagesSent((prev) => prev + count);
   };
 
+  const saveSpecialtyRecord = (
+    patientId: string,
+    specialty: Specialty,
+    data: Record<string, string>
+  ) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              specialtyRecords: {
+                ...(p.specialtyRecords || {}),
+                [specialty]: data,
+              },
+            }
+          : p
+      )
+    );
+    showToast(`Ficha clínica de ${specialty} actualizada`);
+  };
+
+  const grantDiagnosisPermission = (
+    patientId: string,
+    payload: {
+      consultationId?: string;
+      targetSpecialty: Specialty;
+      reason: string;
+      grantedByDoctor?: string;
+    }
+  ) => {
+    const newPerm: DiagnosisPermission = {
+      id: `perm-${Date.now()}`,
+      patientId,
+      consultationId: payload.consultationId,
+      grantedByDoctor: payload.grantedByDoctor || 'Dra. Valeria Méndez',
+      grantedBySpecialty: activeDoctorSpecialty,
+      targetSpecialty: payload.targetSpecialty,
+      reason: payload.reason,
+      createdAt: new Date().toISOString().slice(0, 10),
+      active: true,
+    };
+
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              diagnosisPermissions: [newPerm, ...(p.diagnosisPermissions || [])],
+            }
+          : p
+      )
+    );
+
+    const pat = patients.find((p) => p.id === patientId);
+    logAuditEvent({
+      user: newPerm.grantedByDoctor,
+      role: 'Médico Especialista',
+      action: 'Creación de Consulta',
+      patientName: pat ? `${pat.firstName} ${pat.lastName}` : patientId,
+      previousValue: { diagnosisAccess: false },
+      newValue: {
+        grantedFrom: activeDoctorSpecialty,
+        targetSpecialty: payload.targetSpecialty,
+        consultationId: payload.consultationId || 'all',
+        reason: payload.reason,
+      },
+    });
+    showToast(`Permiso de diagnóstico otorgado a ${payload.targetSpecialty}`);
+  };
+
+  const revokeDiagnosisPermission = (patientId: string, permissionId: string) => {
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === patientId
+          ? {
+              ...p,
+              diagnosisPermissions: (p.diagnosisPermissions || []).map((perm) =>
+                perm.id === permissionId ? { ...perm, active: false } : perm
+              ),
+            }
+          : p
+      )
+    );
+    showToast('Permiso de diagnóstico revocado');
+  };
+
+  const canViewConsultationDiagnosis = (
+    patient: Patient,
+    consultation: PastConsultationSummary,
+    viewerSpecialty: Specialty
+  ): boolean => {
+    if (consultation.specialty === viewerSpecialty) return true;
+    return (patient.diagnosisPermissions || []).some(
+      (perm) =>
+        perm.active &&
+        perm.targetSpecialty === viewerSpecialty &&
+        (!perm.consultationId || perm.consultationId === consultation.id)
+    );
+  };
+
+  const saveAssistantAssignment = (assignment: Omit<AssistantAssignment, 'id'> & { id?: string }) => {
+    const id = assignment.id || `asist-${Date.now()}`;
+    setAssistants((prev) => {
+      const exists = prev.some((a) => a.id === id);
+      const nextItem: AssistantAssignment = { ...assignment, id };
+      return exists ? prev.map((a) => (a.id === id ? nextItem : a)) : [nextItem, ...prev];
+    });
+    showToast(
+      assignment.mode === 'COMPARTIDA_CLINICA'
+        ? `Asistente compartida asignada a ${assignment.assignedDoctorIds.length} médicos`
+        : `Asistente personal ${assignment.assistantName} guardada`
+    );
+  };
+
+  const toggleAssistantPermission = (assistantId: string, key: keyof AssistantPermissions) => {
+    setAssistants((prev) =>
+      prev.map((a) =>
+        a.id === assistantId
+          ? { ...a, permissions: { ...a.permissions, [key]: !a.permissions[key] } }
+          : a
+      )
+    );
+    showToast('Permiso de asistente actualizado');
+  };
+
+  const toggleAssistantViewPermission = (assistantId: string, viewId: ViewId) => {
+    setAssistants((prev) =>
+      prev.map((a) => {
+        if (a.id !== assistantId) return a;
+        const current = a.allowedViews || ['agenda', 'perfil'];
+        const has = current.includes(viewId);
+        const next = has ? current.filter((v) => v !== viewId) : [...current, viewId];
+        return { ...a, allowedViews: next };
+      })
+    );
+    showToast('Permiso de vista actualizado para la asistente');
+  };
+
+  const isAssistant = currentUser?.roleCode === 'ASISTENTE';
+  const isAdmin = currentUser?.roleCode === 'ADMIN';
+
+  const requestAdminAgendaPermission = (doctorId: string, reason: string) => {
+    const doc = doctors.find((d) => d.id === doctorId);
+    if (!doc) return;
+    const req: AdminAgendaPermissionRequest = {
+      id: `req-agenda-${Date.now()}`,
+      requestedByAdminName: currentUser?.name || 'Administrador Clínica',
+      doctorId: doc.id,
+      doctorName: doc.name,
+      reason: reason.trim() || 'Solicitud de autorización puntual para agendar cita en nombre del médico.',
+      status: 'PENDIENTE',
+      createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    };
+    setAdminAgendaRequests((prev) => [req, ...prev]);
+    logAuditEvent({
+      user: req.requestedByAdminName,
+      role: 'Administrador Tenant',
+      action: 'Creación de Consulta',
+      patientName: `Permiso Agenda → ${doc.name}`,
+      previousValue: { agendaPermission: 'DENIED_FOR_ADMIN' },
+      newValue: { status: 'PENDIENTE', doctorId: doc.id, reason: req.reason },
+    });
+    showToast(`Solicitud de permiso enviada a ${doc.name}`);
+  };
+
+  const resolveAdminAgendaPermission = (requestId: string, approved: boolean) => {
+    setAdminAgendaRequests((prev) =>
+      prev.map((r) =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: approved ? 'APROBADO' : 'RECHAZADO',
+              resolvedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            }
+          : r
+      )
+    );
+    showToast(approved ? 'Permiso de agenda aprobado para el Admin' : 'Solicitud de agenda rechazada');
+  };
+
+  const canAdminScheduleForDoctor = (doctorId: string): boolean => {
+    if (!isAdmin) return true;
+    return adminAgendaRequests.some((r) => r.doctorId === doctorId && r.status === 'APROBADO');
+  };
+  const activeAssistantProfile = isAssistant
+    ? assistants.find(
+        (a) =>
+          a.id === currentUser?.id ||
+          a.assistantUsername.toLowerCase() === (currentUser?.username || '').toLowerCase()
+      ) ||
+      assistants[0] ||
+      null
+    : null;
+
+  const removeAssistantAssignment = (assistantId: string) => {
+    setAssistants((prev) => prev.filter((a) => a.id !== assistantId));
+    showToast('Asignación de asistente eliminada');
+  };
+
+  const rescheduleAppointment = (
+    appointmentId: string,
+    newDate: string,
+    newTime: string,
+    doctorId?: string,
+    reason?: string
+  ) => {
+    const targetDoc = doctorId ? doctors.find((d) => d.id === doctorId) : undefined;
+    setAppointments((prev) =>
+      prev.map((apt) =>
+        apt.id === appointmentId
+          ? {
+              ...apt,
+              date: newDate,
+              time: newTime,
+              doctorId: targetDoc ? targetDoc.id : apt.doctorId,
+              doctorName: targetDoc ? targetDoc.name : apt.doctorName,
+              specialty: targetDoc ? targetDoc.specialty : apt.specialty,
+              reason: reason?.trim() ? reason.trim() : apt.reason,
+              stage: 'programado',
+            }
+          : apt
+      )
+    );
+    showToast(`Cita reprogramada para el ${newDate} a las ${newTime}`);
+  };
+
   return (
     <MedicalContext.Provider
       value={{
@@ -444,6 +854,9 @@ export const MedicalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCurrentView,
         isAuthenticated,
         setIsAuthenticated,
+        currentUser,
+        setCurrentUser,
+        logout,
         selectedPatientId,
         setSelectedPatientId,
         selectedPatient,
@@ -479,6 +892,28 @@ export const MedicalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateTemplateConfig,
         updateTenantConfig,
         logAuditEvent,
+        activeDoctorSpecialty,
+        setActiveDoctorSpecialty,
+        saveSpecialtyRecord,
+        grantDiagnosisPermission,
+        revokeDiagnosisPermission,
+        canViewConsultationDiagnosis,
+        doctors,
+        assistants,
+        isAssistant,
+        isAdmin,
+        activeAssistantProfile,
+        activeManagedDoctorId,
+        setActiveManagedDoctorId,
+        saveAssistantAssignment,
+        toggleAssistantPermission,
+        toggleAssistantViewPermission,
+        removeAssistantAssignment,
+        adminAgendaRequests,
+        requestAdminAgendaPermission,
+        resolveAdminAgendaPermission,
+        canAdminScheduleForDoctor,
+        rescheduleAppointment,
         aiMinutesUsed,
         whatsappMessagesSent,
         incrementAiUsage,

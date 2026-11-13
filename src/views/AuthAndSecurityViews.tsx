@@ -19,7 +19,8 @@ import {
   ChevronUp,
   RefreshCw,
 } from 'lucide-react';
-import { useMedical } from '../context/MedicalContext';
+import { useMedical, AuthUser } from '../context/MedicalContext';
+import { medicareApi } from '../api/medicareApi';
 import { ASSETS } from '../data/mockClinicalData';
 import { Specialty } from '../types/medical';
 
@@ -27,28 +28,111 @@ import { Specialty } from '../types/medical';
    VISTA 1: LOGIN MULTI-TENANT (/login)
 ============================================================================ */
 export const LoginView: React.FC = () => {
-  const { setCurrentView, setIsAuthenticated, showToast } = useMedical();
-  const [email, setEmail] = useState('valeria.mendez@medcoresalud.com');
+  const { setCurrentView, setIsAuthenticated, setCurrentUser, showToast } = useMedical();
+  const [identifier, setIdentifier] = useState('valeria.mendez@medcoresalud.com');
   const [password, setPassword] = useState('MedCore2026*');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.includes('@') || password.length < 4) {
-      setErrorBanner('Credenciales inválidas. Verifique su correo institucional y contraseña.');
+    const cleanId = identifier.trim();
+    if (cleanId.length < 3 || password.length < 4) {
+      setErrorBanner('Credenciales inválidas. Ingrese su usuario (ej. superadmin, admin) o correo institucional.');
       return;
     }
+
     setErrorBanner(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const res = await medicareApi.login(cleanId, password);
+      const isSuper = Boolean(res.esSuperAdmin ?? res.user.esSuperAdmin ?? res.user.roleCode === 'SUPERADMIN');
+      setCurrentUser({
+        ...res.user,
+        esSuperAdmin: isSuper,
+      });
       setIsAuthenticated(true);
-      setCurrentView('consulta-activa');
-      showToast('Bienvenida al Puesto Clínico, Dra. Valeria Méndez');
-    }, 550);
+      setCurrentView(
+        res.user.roleCode === 'ASISTENTE'
+          ? 'agenda'
+          : res.user.roleCode === 'ADMIN'
+            ? 'reportes'
+            : 'consulta-activa'
+      );
+      showToast(`Bienvenido/a, ${res.user.name} (${res.user.roleCode})`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const isNetworkError =
+        err instanceof TypeError || /failed to fetch|networkerror|load failed|fetch/i.test(msg);
+
+      if (isNetworkError) {
+        const lower = cleanId.toLowerCase();
+        let demoUser: AuthUser | null = null;
+        if (lower === 'superadmin') {
+          demoUser = {
+            id: 'demo-superadmin',
+            username: 'superadmin',
+            name: 'Super Administrador',
+            email: 'superadmin@medicare.local',
+            roleCode: 'SUPERADMIN',
+            roleName: 'Super Administrador Global',
+            esSuperAdmin: true,
+          };
+        } else if (lower === 'admin') {
+          demoUser = {
+            id: 'demo-admin',
+            username: 'admin',
+            name: 'Administrador Clínica',
+            email: 'admin@medicare.local',
+            roleCode: 'ADMIN',
+            roleName: 'Administrador',
+            esSuperAdmin: false,
+          };
+        } else if (lower === 'asistente' || lower === 'laura.asistente' || lower === 'mariana.clinica') {
+          const isShared = lower === 'mariana.clinica';
+          demoUser = {
+            id: isShared ? 'asist-2' : 'asist-1',
+            username: isShared ? 'mariana.clinica' : 'laura.asistente',
+            name: isShared ? 'Mariana Gómez (Coordinación Clínica)' : 'Laura Pérez',
+            email: isShared ? 'mariana.gomez@medcoresalud.com' : 'laura.perez@medcoresalud.com',
+            roleCode: 'ASISTENTE',
+            roleName: isShared ? 'Asistente Compartida (3 Médicos)' : 'Asistente Personal · Dra. Valeria Méndez',
+            esSuperAdmin: false,
+          };
+        } else if (lower === 'valeria.mendez@medcoresalud.com') {
+          demoUser = {
+            id: 'demo-medico-1',
+            username: 'valeria.mendez',
+            name: 'Dra. Valeria Méndez',
+            email: 'valeria.mendez@medcoresalud.com',
+            roleCode: 'MEDICO',
+            roleName: 'Médico Especialista · MPPS 68412',
+            esSuperAdmin: false,
+          };
+        }
+
+        if (demoUser) {
+          setCurrentUser(demoUser);
+          setIsAuthenticated(true);
+          setCurrentView(
+            demoUser.roleCode === 'ASISTENTE'
+              ? 'agenda'
+              : demoUser.roleCode === 'ADMIN'
+                ? 'reportes'
+                : 'consulta-activa'
+          );
+          showToast(`Modo demo local (API offline): ${demoUser.name}`);
+          return;
+        }
+        setErrorBanner('No se pudo conectar con MediCare.API (http://localhost:5189). Use superadmin, admin o el usuario demo.');
+      } else {
+        setErrorBanner(msg || 'Credenciales inválidas. Verifique su usuario y contraseña.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -125,14 +209,15 @@ export const LoginView: React.FC = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Correo Electrónico Institucional
+                Usuario o Correo Institucional
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="superadmin, admin o correo@clinica.com"
                   className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:outline-none"
                 />
               </div>

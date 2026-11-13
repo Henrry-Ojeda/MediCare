@@ -22,7 +22,16 @@ export const MedicalAgendaView: React.FC = () => {
   const {
     appointments,
     patients,
+    doctors,
+    isAssistant,
+    isAdmin,
+    activeManagedDoctorId,
     addAppointment,
+    rescheduleAppointment,
+    adminAgendaRequests,
+    requestAdminAgendaPermission,
+    resolveAdminAgendaPermission,
+    canAdminScheduleForDoctor,
     navigateToActiveConsultation,
     navigateToPatient360,
     openTriageModal,
@@ -34,19 +43,35 @@ export const MedicalAgendaView: React.FC = () => {
   const [specialtyFilter, setSpecialtyFilter] = useState<string>('Todas');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showNewModal, setShowNewModal] = useState<boolean>(false);
+  const [showAdminRequestModal, setShowAdminRequestModal] = useState<boolean>(false);
+  const [requestDoctorId, setRequestDoctorId] = useState<string>(doctors[0]?.id || 'doc-1');
+  const [requestReason, setRequestReason] = useState<string>(
+    'Reorganización de agenda por ausencia temporal de asistente.'
+  );
+
+  // Reschedule / Postpone Form State
+  const [rescheduleDate, setRescheduleDate] = useState<string>('2026-11-10');
+  const [rescheduleTime, setRescheduleTime] = useState<string>('10:30 AM');
+  const [rescheduleDoctorId, setRescheduleDoctorId] = useState<string>(doctors[0]?.id || 'doc-1');
 
   // New Appointment Form State
   const [newPatientId, setNewPatientId] = useState<string>(patients[0]?.id || 'pat-1');
+  const [newDoctorId, setNewDoctorId] = useState<string>(doctors[0]?.id || 'doc-1');
   const [newTime, setNewTime] = useState<string>('02:30 PM');
   const [newType, setNewType] = useState<AppointmentType>('control');
   const [newReason, setNewReason] = useState<string>(
     'Control periódico de crecimiento y revisión de exámenes.'
   );
 
+  const managedDoctor = doctors.find((d) => d.id === activeManagedDoctorId);
   const filteredAppointments = appointments.filter((apt) => {
+    const matchManaged =
+      activeManagedDoctorId === 'ALL' ||
+      apt.doctorId === activeManagedDoctorId ||
+      (managedDoctor && apt.doctorName === managedDoctor.name);
     const matchDoc = doctorFilter === 'Todos' || apt.doctorName === doctorFilter;
     const matchSpec = specialtyFilter === 'Todas' || apt.specialty === specialtyFilter;
-    return matchDoc && matchSpec;
+    return matchManaged && matchDoc && matchSpec;
   });
 
   const getTypeStyle = (type: AppointmentType) => {
@@ -78,18 +103,26 @@ export const MedicalAgendaView: React.FC = () => {
     }
   };
 
+  const approvedDoctorsForAdmin = doctors.filter((d) => canAdminScheduleForDoctor(d.id));
+  const pendingAdminRequests = adminAgendaRequests.filter((r) => r.status === 'PENDIENTE');
+
   const handleCreateAppointment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isAdmin && !canAdminScheduleForDoctor(newDoctorId)) {
+      showToast('El ADMIN requiere permiso aprobado del médico para agendar esta cita.');
+      return;
+    }
     const pat = patients.find((p) => p.id === newPatientId) || patients[0];
+    const doc = doctors.find((d) => d.id === newDoctorId) || doctors[0];
     addAppointment({
       patientId: pat.id,
       patientName: `${pat.firstName} ${pat.lastName}`,
       patientAgeLabel: calculateExactAgeLabel(pat.birthDate),
       guardianName: pat.guardianName,
       guardianWhatsapp: pat.guardianWhatsapp,
-      doctorName:
-        pat.primarySpecialty === 'Ginecología' ? 'Dr. Alejandro Pérez' : 'Dra. Valeria Méndez',
-      specialty: pat.primarySpecialty,
+      doctorId: doc?.id,
+      doctorName: doc ? doc.name : 'Dra. Valeria Méndez',
+      specialty: doc ? doc.specialty : pat.primarySpecialty,
       date: '2026-11-09',
       time: newTime,
       durationMinutes: 30,
@@ -102,6 +135,83 @@ export const MedicalAgendaView: React.FC = () => {
 
   return (
     <div className="space-y-5">
+      {/* Banner de Control ADMIN / Solicitudes de Permiso de Agenda */}
+      {isAdmin && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="text-xs font-bold text-amber-900">
+              Modo Supervisión (ADMIN) — Agenda de Solo Lectura
+            </div>
+            <p className="text-xs text-amber-800">
+              El administrador no puede crear citas directamente. Para agendar, debe ingresar con el usuario del médico o solicitar su autorización.
+            </p>
+            {adminAgendaRequests.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {adminAgendaRequests.slice(0, 4).map((req) => (
+                  <span
+                    key={req.id}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      req.status === 'APROBADO'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : req.status === 'RECHAZADO'
+                          ? 'bg-rose-100 text-rose-800'
+                          : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {req.doctorName}: {req.status}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAdminRequestModal(true)}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer shrink-0"
+          >
+            Solicitar Permiso a un Médico
+          </button>
+        </div>
+      )}
+
+      {!isAdmin && !isAssistant && pendingAdminRequests.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4 space-y-2.5">
+          <div className="text-xs font-bold text-sky-950">
+            Solicitudes de Permiso de Agenda del Administrador ({pendingAdminRequests.length})
+          </div>
+          <div className="space-y-2">
+            {pendingAdminRequests.map((req) => (
+              <div
+                key={req.id}
+                className="bg-white rounded-xl border border-sky-200 p-3 flex flex-wrap items-center justify-between gap-3"
+              >
+                <div className="text-xs">
+                  <span className="font-bold text-slate-900">{req.requestedByAdminName}</span>{' '}
+                  solicita agendar para <span className="font-semibold text-[#0284C7]">{req.doctorName}</span>
+                  <div className="text-[11px] text-slate-500 mt-0.5">Motivo: {req.reason}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => resolveAdminAgendaPermission(req.id, false)}
+                    className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold cursor-pointer"
+                  >
+                    Rechazar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resolveAdminAgendaPermission(req.id, true)}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Aprobar Permiso
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Top Toolbar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -147,11 +257,29 @@ export const MedicalAgendaView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowNewModal(true)}
-          className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs hover:-translate-y-0.5 transition-all cursor-pointer"
+          onClick={() => {
+            if (isAdmin && approvedDoctorsForAdmin.length === 0) {
+              setShowAdminRequestModal(true);
+              showToast('Requiere autorización aprobada del médico para agendar citas.');
+              return;
+            }
+            if (isAdmin && approvedDoctorsForAdmin.length > 0) {
+              setNewDoctorId(approvedDoctorsForAdmin[0].id);
+            }
+            setShowNewModal(true);
+          }}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer ${
+            isAdmin && approvedDoctorsForAdmin.length === 0
+              ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+              : 'bg-[#0284C7] hover:bg-[#0369A1] text-white hover:-translate-y-0.5'
+          }`}
         >
           <Plus className="w-4 h-4" />
-          <span>+ Agendar Cita</span>
+          <span>
+            {isAdmin && approvedDoctorsForAdmin.length === 0
+              ? 'Agendar (Requiere Permiso)'
+              : '+ Agendar Cita'}
+          </span>
         </button>
       </div>
 
@@ -260,7 +388,57 @@ export const MedicalAgendaView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 pt-2">
+              {/* Posponer / Acomodar Cita (Asistente Personal o Compartida) */}
+              <div className="p-3.5 rounded-xl bg-violet-50/70 border border-violet-200/80 space-y-2.5">
+                <div className="text-[11px] font-bold text-violet-900 uppercase tracking-wider">
+                  Posponer / Reprogramar Cita
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="px-2.5 py-1.5 text-xs bg-white border border-violet-200 rounded-lg"
+                  />
+                  <input
+                    type="text"
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    placeholder="10:30 AM"
+                    className="px-2.5 py-1.5 text-xs font-mono bg-white border border-violet-200 rounded-lg"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={rescheduleDoctorId}
+                    onChange={(e) => setRescheduleDoctorId(e.target.value)}
+                    className="flex-1 px-2.5 py-1.5 text-xs bg-white border border-violet-200 rounded-lg"
+                  >
+                    {doctors.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.specialty})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      rescheduleAppointment(
+                        selectedAppointment.id,
+                        rescheduleDate,
+                        rescheduleTime,
+                        rescheduleDoctorId
+                      );
+                      setSelectedAppointment(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold cursor-pointer shrink-0"
+                  >
+                    Reprogramar
+                  </button>
+                </div>
+              </div>
+
+              <div className={`grid gap-2.5 pt-2 ${isAssistant || isAdmin ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 <button
                   onClick={() => {
                     const apt = selectedAppointment;
@@ -271,16 +449,18 @@ export const MedicalAgendaView: React.FC = () => {
                 >
                   Registrar Signos Triaje
                 </button>
-                <button
-                  onClick={() => {
-                    const patId = selectedAppointment.patientId;
-                    setSelectedAppointment(null);
-                    navigateToActiveConsultation(patId);
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
-                >
-                  Iniciar Consulta IA →
-                </button>
+                {!isAssistant && !isAdmin && (
+                  <button
+                    onClick={() => {
+                      const patId = selectedAppointment.patientId;
+                      setSelectedAppointment(null);
+                      navigateToActiveConsultation(patId);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+                  >
+                    Iniciar Consulta IA →
+                  </button>
+                )}
               </div>
 
               <button
@@ -331,6 +511,23 @@ export const MedicalAgendaView: React.FC = () => {
                     {patients.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.firstName} {p.lastName} ({p.primarySpecialty})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Médico Tratante
+                  </label>
+                  <select
+                    value={newDoctorId}
+                    onChange={(e) => setNewDoctorId(e.target.value)}
+                    className="w-full px-3.5 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    {(isAdmin ? approvedDoctorsForAdmin : doctors).map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.specialty})
                       </option>
                     ))}
                   </select>
@@ -393,6 +590,77 @@ export const MedicalAgendaView: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: Solicitud de Permiso de Agenda (ADMIN -> Médico) */}
+      <AnimatePresence>
+        {showAdminRequestModal && (
+          <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900">Solicitar Permiso de Agenda al Médico</h3>
+                <button
+                  onClick={() => setShowAdminRequestModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-slate-600">
+                Como <strong>ADMIN</strong>, no puedes agendar citas sin autorización previa. Envía una solicitud al doctor para que la apruebe desde su sesión.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Médico</label>
+                  <select
+                    value={requestDoctorId}
+                    onChange={(e) => setRequestDoctorId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl"
+                  >
+                    {doctors.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.specialty})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Motivo de la Solicitud</label>
+                  <textarea
+                    rows={2}
+                    value={requestReason}
+                    onChange={(e) => setRequestReason(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl"
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdminRequestModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      requestAdminAgendaPermission(requestDoctorId, requestReason);
+                      setShowAdminRequestModal(false);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Enviar Solicitud al Doctor
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

@@ -1,4 +1,5 @@
 export type Specialty =
+  | 'Medicina General'
   | 'Pediatría'
   | 'Ginecología'
   | 'Medicina Interna / Cardiología'
@@ -115,6 +116,7 @@ export interface PastConsultationSummary {
   id: string;
   date: string;
   specialty: Specialty;
+  doctorId?: string;
   doctorName: string;
   reason: string;
   cie10Code: string;
@@ -127,6 +129,18 @@ export interface PastConsultationSummary {
   prescriptions: PrescriptionItem[];
   parentGuide: string;
   alarmSigns: string[];
+}
+
+export interface DiagnosisPermission {
+  id: string;
+  patientId: string;
+  consultationId?: string;
+  grantedByDoctor: string;
+  grantedBySpecialty: Specialty;
+  targetSpecialty: Specialty;
+  reason: string;
+  createdAt: string;
+  active: boolean;
 }
 
 export interface Patient {
@@ -149,6 +163,8 @@ export interface Patient {
   guardianWhatsapp: string;
   guardianEmail: string;
   perinatal: PerinatalRecord;
+  specialtyRecords?: Partial<Record<Specialty, Record<string, string>>>;
+  diagnosisPermissions?: DiagnosisPermission[];
   growthHistory: GrowthMeasurement[];
   vaccines: VaccineDoseRecord[];
   studies: MedicalStudyFile[];
@@ -167,6 +183,7 @@ export interface Appointment {
   patientAgeLabel: string;
   guardianName: string;
   guardianWhatsapp: string;
+  doctorId?: string;
   doctorName: string;
   specialty: Specialty;
   date: string;
@@ -188,6 +205,7 @@ export interface PaymentRecord {
   patientName: string;
   guardianName: string;
   guardianIdDocument: string;
+  doctorId?: string;
   doctorName: string;
   specialty: Specialty;
   concept: 'Consulta Especializada' | 'Control de Niño Sano' | 'Esquema de Vacunación' | 'Certificado Médico' | 'Ecografía Diagnóstica';
@@ -241,4 +259,52 @@ export interface ClinicTenantConfig {
   billingCurrency: 'USD' | 'VES';
   autoSyncBcv: boolean;
   bcvRate: number;
+}
+
+export interface DoctorProfile {
+  id: string;
+  name: string;
+  specialty: Specialty;
+  licenseNumber: string;
+}
+
+export interface AssistantPermissions {
+  canSchedule: boolean;
+  canRegisterPatientInfo: boolean;
+  canCollectPayments: boolean;
+  canRescheduleOrCancel: boolean;
+}
+
+export interface AssistantAssignment {
+  id: string;
+  assistantName: string;
+  assistantUsername: string;
+  assistantEmail: string;
+  mode: 'PERSONAL' | 'COMPARTIDA_CLINICA';
+  assignedDoctorIds: string[];
+  permissions: AssistantPermissions;
+  allowedViews: ViewId[];
+  active: boolean;
+}
+
+export const ASSISTANT_GRANTABLE_VIEWS: { id: ViewId; label: string; description: string }[] = [
+  { id: 'agenda', label: 'Agenda Médica', description: 'Agendar, posponer y acomodar citas' },
+  { id: 'sala-espera', label: 'Sala de Espera / Triaje', description: 'Admisión y signos vitales' },
+  { id: 'pacientes', label: 'Directorio de Pacientes', description: 'Buscar y consultar pacientes' },
+  { id: 'paciente-nuevo', label: 'Registrar Paciente', description: 'Crear ficha administrativa' },
+  { id: 'paciente-detalle', label: 'Expediente 360° (Datos)', description: 'Ver contacto y estudios' },
+  { id: 'vacunas-carnet', label: 'Carnet de Vacunas', description: 'Consultar esquema de vacunas' },
+  { id: 'caja', label: 'Cuaderno de Caja BCV', description: 'Cobros y facturación' },
+  { id: 'caja-recibos', label: 'Recibos de Seguros', description: 'Emisión de recibos' },
+];
+
+export interface AdminAgendaPermissionRequest {
+  id: string;
+  requestedByAdminName: string;
+  doctorId: string;
+  doctorName: string;
+  reason: string;
+  status: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  createdAt: string;
+  resolvedAt?: string;
 }
