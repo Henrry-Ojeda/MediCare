@@ -1,9 +1,4 @@
-export {
-  LoginView,
-  RecoverPasswordView,
-  ResetPasswordView,
-  OnboardingView,
-  DoctorProfileView,
-  AuditLogView,
-} from '../../views/AuthAndSecurityViews';
-
+export { LoginView } from './LoginView';
+export { RecoverPasswordView } from './RecoverPasswordView';
+export { ResetPasswordView } from './ResetPasswordView';
+export { OnboardingView } from './OnboardingView';

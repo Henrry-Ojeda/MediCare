@@ -13,3 +13,4 @@ GO
 IF NOT EXISTS (SELECT 1 FROM dbo.TB_SCHEMA_VERSIONS WHERE ScriptName = 'V001__Create_SchemaVersions.sql')
     INSERT INTO dbo.TB_SCHEMA_VERSIONS (ScriptName) VALUES ('V001__Create_SchemaVersions.sql');
 GO
+

@@ -1,8 +1,7 @@
 export { Card } from './Card';
+export { KpiCard } from './KpiCard';
 export { Modal } from './Modal';
 export { StatusBadge } from './StatusBadge';
-export type { BadgeVariant } from './StatusBadge';
-export { KpiCard } from './KpiCard';
 export { DataTable } from './DataTable';
-export type { DataTableColumn } from './DataTable';
-
+export type { DataTableColumn, DataTableColumn as ColumnDef } from './DataTable';
+export { AllergyAlertBadge } from './AllergyAlertBadge';

@@ -32,3 +32,4 @@ GO
 
 INSERT INTO dbo.TB_SCHEMA_VERSIONS (ScriptName) VALUES ('V002__Asistente_Medicos.sql');
 GO
+
