@@ -59,7 +59,11 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu, onOpenNotifica
             {VIEW_TITLES[currentView] || 'MediCare Pediatría'}
           </h1>
           <p className="hidden sm:block text-[11px] text-slate-500 truncate">
-            Paciente activo: <strong className="text-slate-700">{selectedPatient.firstName} {selectedPatient.lastName}</strong> · En espera: {waitingCount}
+            Paciente activo:{' '}
+            <strong className="text-slate-700">
+              {selectedPatient ? `${selectedPatient.firstName} ${selectedPatient.lastName}` : 'Sin paciente seleccionado'}
+            </strong>{' '}
+            · En espera: {waitingCount}
           </p>
         </div>
       </div>
@@ -89,7 +93,9 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu, onOpenNotifica
                     onClick={() => {
                       callAssistantFromConsultorio(
                         reason,
-                        `${selectedPatient.firstName} ${selectedPatient.lastName}`
+                        selectedPatient
+                          ? `${selectedPatient.firstName} ${selectedPatient.lastName}`
+                          : undefined
                       );
                       setShowCallMenu(false);
                     }}

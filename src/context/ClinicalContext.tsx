@@ -34,7 +34,7 @@ interface ClinicalContextValue {
   setCurrentView: (view: ViewId) => void;
   selectedPatientId: string;
   setSelectedPatientId: (id: string) => void;
-  selectedPatient: Patient;
+  selectedPatient: Patient | undefined;
   patients: Patient[];
   appointments: Appointment[];
   payments: PaymentRecord[];
