@@ -16,3 +16,4 @@ obj/
 *.keystore
 android/keystore.properties
 .vscode/
+.vercel
