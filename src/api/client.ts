@@ -58,6 +58,8 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
+export const UNAUTHORIZED_EVENT = 'medicare:unauthorized';
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -71,13 +73,21 @@ export async function apiFetch<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const res = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     ...options,
     headers,
   });
 
   if (!res.ok) {
     const errPayload = await res.json().catch(() => ({}));
+    if (res.status === 401 && !normalizedPath.startsWith('/auth/login')) {
+      setAuthToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+      }
+      throw new Error(errPayload?.message || 'Sesión expirada o sin autorización. Inicia sesión nuevamente.');
+    }
     throw new Error(errPayload?.message || `Error HTTP ${res.status}`);
   }
 
