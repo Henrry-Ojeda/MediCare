@@ -736,6 +736,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         targetRoles: ['PEDIATRA', 'ASISTENTE'],
         patientId: patient.id,
         appointmentId: createdApt.id,
+        targetUserId: assignedDoctor?.id,
       });
       showToast(`URGENCIA registrada: ${createdApt.patientName} (notificado a ${createdApt.doctorName})`);
     } else {
@@ -746,6 +747,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         targetRoles: ['PEDIATRA', 'ASISTENTE'],
         patientId: patient.id,
         appointmentId: createdApt.id,
+        targetUserId: assignedDoctor?.id,
       });
       showToast(`${createdApt.patientName} agregado a Sala de Espera`);
     }
@@ -798,6 +800,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       targetRoles: ['PEDIATRA'],
       patientId: targetApt.patientId,
       appointmentId,
+      targetUserId: targetApt.doctorId,
     });
     showToast(`${targetApt.patientName} enviado a Consultorio y notificado a la Doctora`);
   };

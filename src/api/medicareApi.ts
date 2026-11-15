@@ -423,6 +423,7 @@ export const medicareApi = {
         read: boolean;
         patientId?: string;
         appointmentId?: string;
+        targetUserId?: string;
       }>;
       activeAssistantCall: {
         id: string;
@@ -445,6 +446,7 @@ export const medicareApi = {
     targetRoles: string[];
     patientId?: string;
     appointmentId?: string;
+    targetUserId?: string;
   }) =>
     apiFetch<{ id: string; createdAt: string }>('/notifications', {
       method: 'POST',
