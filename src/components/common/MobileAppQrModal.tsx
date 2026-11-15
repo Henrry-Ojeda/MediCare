@@ -34,6 +34,33 @@ export const MobileAppQrModal: React.FC<MobileAppQrModalProps> = ({ isOpen, onCl
     if (!isOpen) return;
     let active = true;
 
+    const fallbackOrigin =
+      (typeof window !== 'undefined' &&
+        window.location.protocol !== 'capacitor:' &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1'
+        ? window.location.origin
+        : '') ||
+      import.meta.env.VITE_PUBLIC_APP_URL?.replace(/\/$/, '') ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
+
+    const applyFallbackWithApkCheck = async (targetOrigin: string) => {
+      if (!active || !targetOrigin) return;
+      setAppUrl(targetOrigin);
+      try {
+        const headRes = await fetch(`${targetOrigin}/downloads/MediCare.apk`, { method: 'HEAD' });
+        if (!active) return;
+        const hasApk = headRes.ok;
+        setApkAvailable(hasApk);
+        setMode(hasApk ? 'apk' : 'web');
+      } catch {
+        if (!active) return;
+        const isVercel = targetOrigin.includes('.vercel.app');
+        setApkAvailable(isVercel);
+        setMode(isVercel ? 'apk' : 'web');
+      }
+    };
+
     fetch('/api/system/network-info')
       .then((res) => (res.ok ? res.json() : null))
       .then((data: NetworkInfoResponse | null) => {
@@ -50,15 +77,13 @@ export const MobileAppQrModal: React.FC<MobileAppQrModalProps> = ({ isOpen, onCl
           setApkAvailable(Boolean(data.apkAvailable));
           setMode(data.apkAvailable ? 'apk' : 'web');
           setAllIps(isLocalhost && Array.isArray(data.allIps) ? data.allIps : []);
-        } else if (browserOrigin) {
-          setAppUrl(browserOrigin);
-          setMode('web');
+        } else if (fallbackOrigin) {
+          void applyFallbackWithApkCheck(fallbackOrigin);
         }
       })
       .catch(() => {
-        if (active && typeof window !== 'undefined') {
-          setAppUrl(window.location.origin);
-          setMode('web');
+        if (active && fallbackOrigin) {
+          void applyFallbackWithApkCheck(fallbackOrigin);
         }
       });
 
@@ -151,14 +176,14 @@ export const MobileAppQrModal: React.FC<MobileAppQrModalProps> = ({ isOpen, onCl
                 href={activeTargetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-3 py-2 rounded-xl border border-sky-200 bg-white text-xs font-mono font-bold text-sky-700 hover:underline truncate flex items-center gap-1.5"
+                className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-sky-200 bg-white text-xs font-mono font-bold text-sky-700 hover:underline flex items-center gap-1.5"
               >
                 {mode === 'apk' && apkAvailable ? (
                   <Download className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
                 ) : (
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                 )}
-                <span className="truncate">{activeTargetUrl || 'Cargando...'}</span>
+                <span className="break-all leading-snug">{activeTargetUrl || 'Cargando...'}</span>
               </a>
               <button
                 type="button"
