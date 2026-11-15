@@ -20,6 +20,10 @@ function resolveApiBaseUrl(): string {
       return 'http://192.168.1.111:5189/api';
     }
 
+    if (window.location.hostname.endsWith('.vercel.app')) {
+      return '/api';
+    }
+
     if (window.location.hostname) {
       return `http://${window.location.hostname}:5189/api`;
     }

@@ -47,6 +47,7 @@ async function startServer() {
     const apkPath =
       [
         path.join(__dirname, "public", "downloads", "MediCare.apk"),
+        path.join(__dirname, "android", "app", "build", "outputs", "apk", "prod", "release", "app-prod-release.apk"),
         path.join(__dirname, "android", "app", "build", "outputs", "apk", "release", "app-release.apk"),
         path.join(__dirname, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"),
       ].find((p) => fs.existsSync(p)) || "";
