@@ -1,27 +1,29 @@
 const API_SERVER_OVERRIDE_KEY = 'medicare_api_base_url';
 
 function resolveApiBaseUrl(): string {
-  const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-  if (envUrl) return envUrl;
-
   if (typeof window !== 'undefined') {
+    if (window.location.hostname.endsWith('.vercel.app')) {
+      return '/api';
+    }
+
     try {
       const saved = localStorage.getItem(API_SERVER_OVERRIDE_KEY)?.trim().replace(/\/$/, '');
       if (saved) return saved;
     } catch {
       // ignore storage errors
     }
+  }
 
+  const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  if (envUrl) return envUrl;
+
+  if (typeof window !== 'undefined') {
     const isCapacitorNative =
       Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) ||
       window.location.protocol === 'capacitor:';
 
     if (isCapacitorNative) {
       return 'http://192.168.1.111:5189/api';
-    }
-
-    if (window.location.hostname.endsWith('.vercel.app')) {
-      return '/api';
     }
 
     if (window.location.hostname) {
