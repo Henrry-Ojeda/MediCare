@@ -1,5 +1,2 @@
-export {
-  CashbookView,
-  MedicalReceiptsView,
-} from '../../views/FinanceAndReportsViews';
-
+export { CashbookView } from './CashbookView';
+export { MedicalReceiptsView } from './MedicalReceiptsView';
