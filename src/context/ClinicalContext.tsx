@@ -123,11 +123,13 @@ interface ClinicalContextValue {
   updateMasterVaccine: (item: MasterVaccineItem) => void;
   deleteMasterVaccine: (vaccineId: string) => void;
   quickAddToWaitingRoom: (params: {
+    patientId?: string;
     fullName: string;
     idDocument?: string;
     reason?: string;
     guardianWhatsapp?: string;
     doctorId?: string;
+    type?: 'control' | 'urgencia';
   }) => void;
   assignPatientDoctor: (appointmentId: string, doctorId: string) => void;
   sendPatientToConsultorio: (appointmentId: string) => void;
@@ -642,23 +644,27 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const quickAddToWaitingRoom = (params: {
+    patientId?: string;
     fullName: string;
     idDocument?: string;
     reason?: string;
     guardianWhatsapp?: string;
     doctorId?: string;
+    type?: 'control' | 'urgencia';
   }) => {
     const cleanName = params.fullName.trim();
-    if (!cleanName) return;
+    if (!cleanName && !params.patientId) return;
     const parts = cleanName.split(/\s+/);
-    const firstName = parts[0] || cleanName;
+    const firstName = parts[0] || cleanName || 'Paciente';
     const lastName = parts.slice(1).join(' ') || 'Paciente';
 
-    let patient = patients.find(
-      (p) =>
-        `${p.firstName} ${p.lastName}`.toLowerCase() === cleanName.toLowerCase() ||
-        (params.idDocument && p.idDocument === params.idDocument.trim())
-    );
+    let patient =
+      (params.patientId ? patients.find((p) => p.id === params.patientId) : undefined) ||
+      patients.find(
+        (p) =>
+          `${p.firstName} ${p.lastName}`.toLowerCase() === cleanName.toLowerCase() ||
+          (params.idDocument && p.idDocument === params.idDocument.trim())
+      );
 
     if (!patient) {
       patient = addPatient({
@@ -698,6 +704,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
 
     const assignedDoctor = doctors.find((d) => d.id === params.doctorId) || doctors[0];
+    const aptType = params.type === 'urgencia' ? 'urgencia' : 'control';
 
     const createdApt: Appointment = {
       id: `apt-${Date.now()}`,
@@ -712,32 +719,60 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       date: getTodayIsoDate(),
       time: getCurrentTimeLabel(),
       durationMinutes: 30,
-      type: 'control',
-      reason: params.reason?.trim() || 'Consulta Pediátrica',
+      type: aptType,
+      reason: params.reason?.trim() || (aptType === 'urgencia' ? 'Atención Urgente' : 'Consulta Pediátrica'),
       stage: 'en_sala',
       waitingMinutes: 1,
     };
 
     setAppointments((prev) => [createdApt, ...prev]);
-    pushNotification({
-      title: 'Paciente en Sala de Espera',
-      message: `${createdApt.patientName}${patient.idDocument ? ` (${patient.idDocument})` : ''} agregado por recepción.`,
-      category: 'patient_arrived',
-      targetRoles: ['PEDIATRA', 'ASISTENTE'],
-      patientId: patient.id,
-      appointmentId: createdApt.id,
-    });
-    showToast(`${createdApt.patientName} agregado a Sala de Espera`);
+
+    if (aptType === 'urgencia') {
+      pushNotification({
+        title: 'URGENCIA en Sala de Espera',
+        message: `${createdApt.patientName}${patient.idDocument ? ` (${patient.idDocument})` : ''} ingresó como URGENTE · Médico: ${createdApt.doctorName}.`,
+        category: 'triage_ready',
+        priority: 'high',
+        targetRoles: ['PEDIATRA', 'ASISTENTE'],
+        patientId: patient.id,
+        appointmentId: createdApt.id,
+      });
+      showToast(`URGENCIA registrada: ${createdApt.patientName} (notificado a ${createdApt.doctorName})`);
+    } else {
+      pushNotification({
+        title: 'Paciente en Sala de Espera',
+        message: `${createdApt.patientName}${patient.idDocument ? ` (${patient.idDocument})` : ''} agregado por recepción · Médico: ${createdApt.doctorName}.`,
+        category: 'patient_arrived',
+        targetRoles: ['PEDIATRA', 'ASISTENTE'],
+        patientId: patient.id,
+        appointmentId: createdApt.id,
+      });
+      showToast(`${createdApt.patientName} agregado a Sala de Espera`);
+    }
   };
 
   const assignPatientDoctor = (appointmentId: string, doctorId: string) => {
     const doc = doctors.find((d) => d.id === doctorId);
     if (!doc) return;
+    const currentApt = appointments.find((a) => a.id === appointmentId);
     setAppointments((prev) =>
       prev.map((apt) =>
         apt.id === appointmentId ? { ...apt, doctorId: doc.id, doctorName: doc.name } : apt
       )
     );
+    if (currentApt && /^[0-9a-f-]{36}$/i.test(appointmentId) && /^[0-9a-f-]{36}$/i.test(doctorId)) {
+      medicareApi
+        .updateAppointment(appointmentId, {
+          date: currentApt.date,
+          time: currentApt.time,
+          durationMinutes: currentApt.durationMinutes || 30,
+          type: currentApt.type,
+          reason: currentApt.reason,
+          doctorUserId: doctorId,
+          stage: currentApt.stage,
+        })
+        .catch(() => {});
+    }
     showToast(`Paciente asignado a ${doc.name}`);
   };
 
