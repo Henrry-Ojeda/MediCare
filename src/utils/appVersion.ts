@@ -1,6 +1,6 @@
 export const APP_VERSION = '2.4.0';
-export const APK_VERSION_CODE = 5;
-export const APK_VERSION_NAME = '1.4';
+export const APK_VERSION_CODE = 6;
+export const APK_VERSION_NAME = '1.5';
 
 export interface NativeApkUpdateCheck {
   hasUpdate: boolean;
