@@ -1,6 +1,2 @@
-export {
-  PatientDirectoryView,
-  Patient360View,
-  NewPatientFormView,
-} from '../../views/PatientsAndVaccinesViews';
-
+export { PatientDirectoryView } from './PatientDirectoryView';
+export { NewPatientView } from './NewPatientView';

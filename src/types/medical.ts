@@ -7,27 +7,33 @@ export type Specialty =
   | 'Dermatología';
 
 export type ViewId =
-  | 'login'                  // Vista 1: Login Multi-Tenant (/login)
-  | 'recuperar-password'     // Vista 2: Recuperación de Contraseña (/recuperar-password)
-  | 'reset-password'         // Vista 3: Restablecer Contraseña (/reset-password)
-  | 'onboarding'             // Vista 4: Onboarding y Setup Inicial (/onboarding)
-  | 'perfil'                 // Vista 5: Perfil del Médico (/perfil)
-  | 'auditoria'              // Vista 6: Registro de Auditoría (/seguridad/auditoria)
-  | 'agenda'                 // Vista 7: Agenda Médica (/agenda)
-  | 'sala-espera'            // Vista 8: Sala de Espera Virtual (/sala-espera) + Vista 9 Modal Triaje
-  | 'pacientes'              // Vista 10: Directorio General de Pacientes (/pacientes)
-  | 'paciente-detalle'       // Vista 11: Ficha Integral del Paciente 360° (/pacientes/:id)
-  | 'paciente-nuevo'         // Vista 12: Formulario de Registro de Nuevo Paciente (/pacientes/nuevo)
-  | 'vacunas-carnet'         // Vista 13: Carnet Digital de Vacunación (/pacientes/:id/vacunas) + Vista 14 Modal Dosis
-  | 'vacunas-catalogo'       // Vista 15: Catálogo Maestro de Vacunas (/configuracion/vacunas)
-  | 'consulta-activa'        // Vista 16: Puesto de Consulta Médica Activa (/consulta/:id) + Vista 17 Modal Despacho
-  | 'caja'                   // Vista 18: Cuaderno de Caja y Cobros (/caja)
-  | 'caja-recibos'           // Vista 19: Emisión y Control de Recibos (/caja/recibos)
-  | 'reportes'               // Vista 20: Dashboard Estadístico (/reportes)
-  | 'epidemiologia'          // Vista 21: Reporte Epidemiológico (/reportes/epidemiologia)
-  | 'configuracion'          // Vista 22: Ajustes de la Clínica (/configuracion)
-  | 'plantillas'             // Vista 23: Diseñador de Plantillas (/configuracion/plantillas)
-  | 'suscripcion';           // Vista 24: Mi Suscripción SaaS (/configuracion/suscripcion)
+  | 'login'                  // Login Institucional
+  | 'dashboard'              // Dashboard Pediátrico Unificado
+  | 'recuperar-password'     // Recuperación de Contraseña (Sprint 2)
+  | 'reset-password'         // Restablecer Contraseña (Sprint 2)
+  | 'onboarding'             // Onboarding y Setup Inicial (Sprint 2)
+  | 'perfil'                 // Perfil de Usuario
+  | 'firma-medico'           // Firma del Médico y Sello Digital
+  | 'admin-usuarios'         // Gestión de Personal y Asistentes (Admin)
+  | 'admin-doctores'         // CRUD de Doctores (Admin)
+  | 'admin-asistentes'       // CRUD de Asistentes y Asignación M:N (Admin)
+  | 'admin-clinicas'         // CRUD de Clínicas y Asociación Clínica-Médico-Asistente (Admin)
+  | 'auditoria'              // Registro de Auditoría (Sprint 2)
+  | 'agenda'                 // Agenda Médica
+  | 'sala-espera'            // Sala de Espera / Triaje
+  | 'pacientes'              // Directorio de Pacientes
+  | 'paciente-detalle'       // Historial Clínico 360° Pediátrico
+  | 'paciente-nuevo'         // Registro de Nuevo Paciente
+  | 'vacunas-carnet'         // Carnet Digital de Vacunación
+  | 'vacunas-catalogo'       // Catálogo Maestro de Vacunas
+  | 'consulta-activa'        // Consulta Pediátrica + Dictado Clínico IA
+  | 'caja'                   // Cuaderno de Caja BCV (Sprint 2)
+  | 'caja-recibos'           // Recibos de Seguros (Sprint 2)
+  | 'reportes'               // Dashboard Estadístico Avanzado (Sprint 2)
+  | 'epidemiologia'          // Reporte Epidemiológico (Sprint 2)
+  | 'configuracion'          // Ajustes de la Clínica
+  | 'plantillas'             // Diseñador de Plantillas WYSIWYG (Sprint 2)
+  | 'suscripcion';           // Suscripción SaaS (Sprint 2)
 
 export interface VitalSigns {
   weightKg: number;
@@ -143,6 +149,19 @@ export interface DiagnosisPermission {
   active: boolean;
 }
 
+export interface DiagnosisPermissionRecord {
+  id: string;
+  patientId: string;
+  consultationId?: string | null;
+  grantedByUserId: string;
+  grantedByName: string;
+  targetDoctorUserId: string;
+  targetDoctorName: string;
+  reason?: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Patient {
   id: string;
   historyNumber: string;
@@ -244,6 +263,10 @@ export interface RecipeTemplateConfig {
   showDigitalSignature: boolean;
   showWetStamp: boolean;
   footerNote: string;
+  layoutMode?: 'vertical_split' | 'classic';
+  leftColumnTitle?: string;
+  rightColumnTitle?: string;
+  showDiagnosisOnRecipe?: boolean;
 }
 
 export interface ClinicTenantConfig {
@@ -264,6 +287,13 @@ export interface ClinicTenantConfig {
 export interface DoctorProfile {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  username?: string;
+  avatarUrl?: string;
   specialty: Specialty;
   licenseNumber: string;
 }
@@ -278,6 +308,10 @@ export interface AssistantPermissions {
 export interface AssistantAssignment {
   id: string;
   assistantName: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
   assistantUsername: string;
   assistantEmail: string;
   mode: 'PERSONAL' | 'COMPARTIDA_CLINICA';
@@ -285,6 +319,34 @@ export interface AssistantAssignment {
   permissions: AssistantPermissions;
   allowedViews: ViewId[];
   active: boolean;
+}
+
+export interface ClinicAssignmentRecord {
+  id: string;
+  doctorId: string;
+  doctorName?: string;
+  assistantId?: string | null;
+  assistantName?: string | null;
+}
+
+export interface ClinicProfile {
+  id: string;
+  name: string;
+  rif?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  active: boolean;
+  assignments: ClinicAssignmentRecord[];
+}
+
+export interface BcvHistoryEntry {
+  id: number | string;
+  tasa: number;
+  origen: string;
+  recordedAt: string;
+  updatedByName?: string | null;
+  updatedByRole?: string | null;
 }
 
 export const ASSISTANT_GRANTABLE_VIEWS: { id: ViewId; label: string; description: string }[] = [

@@ -1,3 +1,9 @@
+export {
+  calculateAgeInMonths,
+  calculateExactAgeLabel,
+  calculateBmi,
+} from './pediatricCalculations';
+
 export function formatUsd(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
@@ -9,18 +15,13 @@ export function formatVes(amount: number): string {
   })}`;
 }
 
-export function calculateAgeInMonths(birthDateStr: string): number {
-  const birth = new Date(birthDateStr);
-  const now = new Date();
-  return Math.max(
-    0,
-    (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth())
-  );
+export function getTodayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
-export function calculateBmi(weightKg: number, heightCm: number): number {
-  const heightMeters = heightCm / 100;
-  if (heightMeters <= 0) return 0;
-  return Number((weightKg / (heightMeters * heightMeters)).toFixed(1));
+export function getCurrentTimeLabel(): string {
+  return new Date().toLocaleTimeString('es-VE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
-

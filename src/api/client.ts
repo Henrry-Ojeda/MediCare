@@ -1,5 +1,34 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://localhost:5189/api';
+const API_SERVER_OVERRIDE_KEY = 'medicare_api_base_url';
+
+function resolveApiBaseUrl(): string {
+  const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  if (envUrl) return envUrl;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(API_SERVER_OVERRIDE_KEY)?.trim().replace(/\/$/, '');
+      if (saved) return saved;
+    } catch {
+      // ignore storage errors
+    }
+
+    const isCapacitorNative =
+      Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) ||
+      window.location.protocol === 'capacitor:';
+
+    if (isCapacitorNative) {
+      return 'http://192.168.1.111:5189/api';
+    }
+
+    if (window.location.hostname) {
+      return `http://${window.location.hostname}:5189/api`;
+    }
+  }
+
+  return 'http://localhost:5189/api';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const TOKEN_STORAGE_KEY = 'medicare_jwt_token';
 

@@ -1,0 +1,9 @@
+{
+  "name": "MediCare Pediatría",
+  "short_name": "MediCare",
+  "description": "Sistema Clínico Pediátrico y Notificaciones en Tiempo Real",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7"
+}
