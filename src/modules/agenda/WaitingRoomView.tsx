@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Clock, Volume2, Stethoscope, ArrowRight, UserCheck } from 'lucide-react';
+import {
+  Activity,
+  Clock,
+  Volume2,
+  Stethoscope,
+  ArrowRight,
+  UserCheck,
+  UserPlus,
+  Send,
+  BellRing,
+} from 'lucide-react';
 import { useClinical } from '../../context/ClinicalContext';
 import { useAuth } from '../../context/AuthContext';
+import { ROLE_PERMISSIONS } from '../../config/permissions.config';
 import { useNotifications } from '../../context/NotificationContext';
 import { WaitingRoomStage } from '../../types/medical';
 import { playClinicalChime } from '../../utils/soundAndVibrate';
@@ -44,34 +55,218 @@ const COLUMNS: {
 ];
 
 export const WaitingRoomView: React.FC = () => {
-  const { userRole } = useAuth();
+  const { userRole, currentUser } = useAuth();
   const {
     appointments,
+    doctors,
+    currentDoctorHasAssistant,
     updateAppointmentStage,
     openTriageModal,
     navigateToActiveConsultation,
+    quickAddToWaitingRoom,
+    assignPatientDoctor,
+    sendPatientToConsultorio,
+    setCurrentView,
   } = useClinical();
-  const { showToast } = useNotifications();
+  const { showToast, pushNotification } = useNotifications();
 
   const [mobileStage, setMobileStage] = useState<WaitingRoomStage>('en_sala');
   const [calledBanner, setCalledBanner] = useState<string | null>(null);
   const [liveExtraMinutes, setLiveExtraMinutes] = useState(0);
+  const [doctorFilterId, setDoctorFilterId] = useState<string>('ALL');
+
+  // Ingreso rápido por Nombre (Asistente / Recepción)
+  const [quickName, setQuickName] = useState('');
+  const [quickIdDoc, setQuickIdDoc] = useState('');
+  const [quickReason, setQuickReason] = useState('');
+  const [quickDoctorId, setQuickDoctorId] = useState('');
 
   useEffect(() => {
     const interval = setInterval(() => setLiveExtraMinutes((m) => m + 1), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleCallPatient = (patientName: string, appointmentId: string) => {
+  const handleQuickAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim()) return;
+    quickAddToWaitingRoom({
+      fullName: quickName,
+      idDocument: quickIdDoc,
+      reason: quickReason,
+      doctorId: quickDoctorId || doctors[0]?.id,
+    });
+    setQuickName('');
+    setQuickIdDoc('');
+    setQuickReason('');
+    setMobileStage('en_sala');
+  };
+
+  const handleCallPatient = (patientName: string, appointmentId: string, patientId: string) => {
     setCalledBanner(patientName);
     playClinicalChime('patient');
     updateAppointmentStage(appointmentId, 'en_consulta');
-    showToast(`Llamando a consultorio: ${patientName}`);
+    pushNotification({
+      title: 'Llamado a Siguiente Paciente',
+      message: `${currentUser?.name || 'La Doctora'} solicita pasar a ${patientName} al consultorio.`,
+      category: 'assistant_call',
+      priority: 'high',
+      targetRoles: ['ASISTENTE'],
+      patientId,
+      appointmentId,
+    });
+    showToast(`Llamando a consultorio: ${patientName} (Asistente notificado)`);
     setTimeout(() => setCalledBanner(null), 5000);
   };
 
+  const nextWaitingAppointment =
+    appointments.find((a) => a.stage === 'en_triaje') ||
+    appointments.find((a) => a.stage === 'en_sala') ||
+    appointments.find((a) => a.stage === 'programado');
+
+  if (userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-xs">
+        <div className="w-12 h-12 rounded-2xl bg-sky-50 text-[#0284C7] flex items-center justify-center mx-auto">
+          <Stethoscope className="w-6 h-6" />
+        </div>
+        <h2 className="text-base font-bold text-slate-900">Sala de Espera Digital Desactivada</h2>
+        <p className="text-xs text-slate-600">
+          No tienes un asistente asignado, por lo que no se gestiona sala de espera digital. Los pacientes hacen su fila por orden de llegada y puedes buscarlos directamente para atenderlos.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={() => setCurrentView('pacientes')}
+            className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+          >
+            Buscar Paciente
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentView('consulta-activa')}
+            className="px-4 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold cursor-pointer"
+          >
+            Ir a Consulta
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* Barra superior: Ingreso rápido a Sala de Espera + Llamar Siguiente Paciente */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-[#0284C7]" />
+              Ingreso Rápido a Sala de Espera
+            </h2>
+            <p className="text-[11px] text-slate-500">
+              Ingrese el nombre del paciente para agregarlo directo a Sala de Espera.
+            </p>
+          </div>
+
+          {nextWaitingAppointment && (userRole === 'PEDIATRA' || userRole === 'ADMIN') && (
+            <button
+              type="button"
+              onClick={() =>
+                handleCallPatient(
+                  nextWaitingAppointment.patientName,
+                  nextWaitingAppointment.id,
+                  nextWaitingAppointment.patientId
+                )
+              }
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold shadow-sm cursor-pointer shrink-0"
+            >
+              <BellRing className="w-4 h-4" />
+              <span>Llamar al Siguiente ({nextWaitingAppointment.patientName})</span>
+            </button>
+          )}
+        </div>
+
+        {ROLE_PERMISSIONS[userRole].canCreatePatient && (
+          <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <input
+              type="text"
+              required
+              placeholder="Nombre completo del paciente *"
+              value={quickName}
+              onChange={(e) => setQuickName(e.target.value)}
+              className="sm:col-span-4 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:bg-white focus:outline-none focus:border-[#0284C7]"
+            />
+            <input
+              type="text"
+              placeholder="Cédula / Doc."
+              value={quickIdDoc}
+              onChange={(e) => setQuickIdDoc(e.target.value)}
+              className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
+            />
+            <input
+              type="text"
+              placeholder="Motivo (ej. Control)"
+              value={quickReason}
+              onChange={(e) => setQuickReason(e.target.value)}
+              className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
+            />
+            <select
+              value={quickDoctorId || doctors[0]?.id || ''}
+              onChange={(e) => setQuickDoctorId(e.target.value)}
+              className="sm:col-span-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0284C7]"
+            >
+              {doctors.length === 0 ? (
+                <option value="">Pediatra por defecto</option>
+              ) : (
+                doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              type="submit"
+              className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Agregar a Sala</span>
+            </button>
+          </form>
+        )}
+
+        {doctors.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+            <span className="text-[11px] font-bold text-slate-500">Filtrar por Médico:</span>
+            <button
+              type="button"
+              onClick={() => setDoctorFilterId('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold cursor-pointer ${
+                doctorFilterId === 'ALL'
+                  ? 'bg-[#0284C7] text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              Todos
+            </button>
+            {doctors.map((doc) => (
+              <button
+                key={doc.id}
+                type="button"
+                onClick={() => setDoctorFilterId(doc.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold cursor-pointer ${
+                  doctorFilterId === doc.id
+                    ? 'bg-[#0284C7] text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {doc.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {calledBanner && (
         <div className="p-4 rounded-2xl bg-[#0284C7] text-white shadow-md flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -80,7 +275,7 @@ export const WaitingRoomView: React.FC = () => {
               LLAMANDO A CONSULTORIO: {calledBanner}
             </span>
           </div>
-          <span className="text-[11px] font-mono">TIMBRE EMITIDO</span>
+          <span className="text-[11px] font-mono">ASISTENTE NOTIFICADO</span>
         </div>
       )}
 
@@ -110,12 +305,16 @@ export const WaitingRoomView: React.FC = () => {
       {/* Tablero Kanban: 4 columnas en xl, columna activa en móvil/tablet */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
         {COLUMNS.map((col) => {
-          const colItems = appointments.filter((a) => a.stage === col.id);
+          const colItems = appointments.filter(
+            (a) =>
+              a.stage === col.id &&
+              (doctorFilterId === 'ALL' || a.doctorId === doctorFilterId)
+          );
           const hiddenOnMobile = mobileStage !== col.id ? 'hidden xl:flex' : 'flex';
           return (
             <div
               key={col.id}
-              className={`${hiddenOnMobile} bg-white rounded-2xl border border-slate-200/80 shadow-xs flex-col min-h-[380px] xl:min-h-[520px]`}
+              className={`${hiddenOnMobile} bg-white rounded-2xl border border-slate-200/80 shadow-xs flex-col min-h-[380px] xl:min-h-[500px]`}
             >
               <div className="p-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/60">
                 <div>
@@ -152,7 +351,35 @@ export const WaitingRoomView: React.FC = () => {
                       <div>
                         <h3 className="text-xs font-bold text-slate-900">{apt.patientName}</h3>
                         <p className="text-[11px] text-slate-500">{apt.patientAgeLabel}</p>
+                        {apt.reason && (
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5">{apt.reason}</p>
+                        )}
                       </div>
+
+                      {doctors.length > 0 ? (
+                        <div className="flex items-center gap-1.5">
+                          <Stethoscope className="w-3.5 h-3.5 text-[#0284C7] shrink-0" />
+                          <select
+                            value={apt.doctorId || ''}
+                            onChange={(e) => assignPatientDoctor(apt.id, e.target.value)}
+                            className="w-full px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-700"
+                            title="Asignar médico al paciente"
+                          >
+                            <option value="" disabled>
+                              Asignar médico...
+                            </option>
+                            {doctors.map((doc) => (
+                              <option key={doc.id} value={doc.id}>
+                                {doc.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] font-medium text-sky-700 flex items-center gap-1">
+                          <Stethoscope className="w-3 h-3" /> {apt.doctorName}
+                        </p>
+                      )}
 
                       {apt.triageVitals && (
                         <div className="p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-[11px] font-mono text-slate-700 flex items-center justify-between">
@@ -191,14 +418,27 @@ export const WaitingRoomView: React.FC = () => {
                         )}
 
                         {col.id !== 'en_consulta' ? (
-                          <button
-                            type="button"
-                            onClick={() => handleCallPatient(apt.patientName, apt.id)}
-                            className="w-full py-2.5 px-3 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                            <span>Llamar a Consultorio</span>
-                          </button>
+                          userRole === 'ASISTENTE' ? (
+                            <button
+                              type="button"
+                              onClick={() => sendPatientToConsultorio(apt.id)}
+                              className="w-full py-2.5 px-3 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Enviar a Consultorio</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCallPatient(apt.patientName, apt.id, apt.patientId)
+                              }
+                              className="w-full py-2.5 px-3 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Volume2 className="w-3.5 h-3.5" />
+                              <span>Llamar a Consultorio</span>
+                            </button>
+                          )
                         ) : (
                           userRole === 'PEDIATRA' && (
                             <button

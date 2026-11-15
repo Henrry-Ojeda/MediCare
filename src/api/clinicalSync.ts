@@ -76,7 +76,7 @@ export function mapApiAppointmentToModel(row: AnyRecord): Appointment {
     guardianName: String(pick(row, 'guardianName', 'GuardianName', '')),
     guardianWhatsapp: String(pick(row, 'guardianWhatsapp', 'GuardianWhatsapp', '')),
     doctorId: String(pick(row, 'doctorUserId', 'DoctorUserId', 'doc-1')),
-    doctorName: String(pick(row, 'doctorName', 'DoctorName', 'Dra. Valeria Méndez')),
+    doctorName: String(pick(row, 'doctorName', 'DoctorName', 'Médico Tratante')),
     specialty: 'Pediatría',
     date,
     time: String(pick(row, 'time', 'Time', '09:00 AM')),
@@ -185,6 +185,25 @@ export const clinicalSync = {
   ) {
     if (!hasRealAuthSession()) return;
     await medicareApi.applyVaccineDose(patientId, doseId, payload);
+  },
+
+  async addPatientVaccineDose(
+    patientId: string,
+    payload: {
+      vaccineId?: string;
+      vaccineName: string;
+      milestoneLabel: string;
+      milestoneMonths: number;
+      doseNumber: string;
+      status: 'aplicada' | 'pendiente';
+      appliedDate?: string;
+      batchNumber?: string;
+      manufacturer?: string;
+      observations?: string;
+    }
+  ): Promise<Record<string, unknown> | null> {
+    if (!hasRealAuthSession()) return null;
+    return medicareApi.addPatientVaccineDose(patientId, payload);
   },
 
   async completeConsultation(

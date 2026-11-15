@@ -25,7 +25,11 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
     secondsElapsed,
     status,
     transcript,
+    interimTranscript,
     speechSupported,
+    audioUrl,
+    audioLevel,
+    micError,
     setTranscript,
     startRecording,
     stopRecording,
@@ -167,6 +171,38 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
           {showTranscriptBox ? 'Ocultar transcripción' : 'Ver transcripción'}
         </button>
       </div>
+
+      {micError && (
+        <div className="rounded-xl bg-rose-500/20 border border-rose-400/50 px-3.5 py-2 text-xs text-rose-100">
+          {micError}
+        </div>
+      )}
+
+      {isRecording && (
+        <div className="flex items-center gap-3 rounded-xl bg-slate-950/50 border border-white/10 px-3.5 py-2">
+          <span className="text-[11px] font-semibold text-rose-300 shrink-0">
+            {isPaused ? 'En pausa' : 'Micrófono activo'}
+          </span>
+          <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-rose-400 transition-all duration-100"
+              style={{ width: `${Math.max(4, audioLevel)}%` }}
+            />
+          </div>
+          {interimTranscript && (
+            <span className="text-[11px] italic text-sky-200 truncate max-w-xs">
+              "{interimTranscript}"
+            </span>
+          )}
+        </div>
+      )}
+
+      {audioUrl && !isRecording && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-950/50 border border-white/10 px-3.5 py-2">
+          <span className="text-[11px] font-semibold text-emerald-300">Audio grabado:</span>
+          <audio controls src={audioUrl} className="h-8 flex-1 min-w-[200px]" />
+        </div>
+      )}
 
       {showTranscriptBox && (
         <textarea

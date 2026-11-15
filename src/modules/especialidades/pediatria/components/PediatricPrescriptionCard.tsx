@@ -45,12 +45,12 @@ export const PediatricPrescriptionCard: React.FC<PediatricPrescriptionCardProps>
   const handleAddManualDrug = () => {
     const newItem: PrescriptionItem = {
       id: `rx-${Date.now()}`,
-      medicationName: 'Nuevo Medicamento',
-      presentation: 'Suspensión / Tabletas',
-      dosePerTake: '5 ml',
-      frequencyHours: '8',
-      durationDays: '5',
-      specialInstructions: 'Administrar después de los alimentos.',
+      medicationName: '',
+      presentation: '',
+      dosePerTake: '',
+      frequencyHours: '',
+      durationDays: '',
+      specialInstructions: '',
     };
     onChange([...prescriptions, newItem]);
   };

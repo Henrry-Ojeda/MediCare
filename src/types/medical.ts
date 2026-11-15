@@ -15,6 +15,9 @@ export type ViewId =
   | 'perfil'                 // Perfil de Usuario
   | 'firma-medico'           // Firma del Médico y Sello Digital
   | 'admin-usuarios'         // Gestión de Personal y Asistentes (Admin)
+  | 'admin-doctores'         // CRUD de Doctores (Admin)
+  | 'admin-asistentes'       // CRUD de Asistentes y Asignación M:N (Admin)
+  | 'admin-clinicas'         // CRUD de Clínicas y Asociación Clínica-Médico-Asistente (Admin)
   | 'auditoria'              // Registro de Auditoría (Sprint 2)
   | 'agenda'                 // Agenda Médica
   | 'sala-espera'            // Sala de Espera / Triaje
@@ -146,6 +149,19 @@ export interface DiagnosisPermission {
   active: boolean;
 }
 
+export interface DiagnosisPermissionRecord {
+  id: string;
+  patientId: string;
+  consultationId?: string | null;
+  grantedByUserId: string;
+  grantedByName: string;
+  targetDoctorUserId: string;
+  targetDoctorName: string;
+  reason?: string;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Patient {
   id: string;
   historyNumber: string;
@@ -247,6 +263,10 @@ export interface RecipeTemplateConfig {
   showDigitalSignature: boolean;
   showWetStamp: boolean;
   footerNote: string;
+  layoutMode?: 'vertical_split' | 'classic';
+  leftColumnTitle?: string;
+  rightColumnTitle?: string;
+  showDiagnosisOnRecipe?: boolean;
 }
 
 export interface ClinicTenantConfig {
@@ -267,6 +287,13 @@ export interface ClinicTenantConfig {
 export interface DoctorProfile {
   id: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
+  email?: string;
+  username?: string;
+  avatarUrl?: string;
   specialty: Specialty;
   licenseNumber: string;
 }
@@ -281,6 +308,10 @@ export interface AssistantPermissions {
 export interface AssistantAssignment {
   id: string;
   assistantName: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
   assistantUsername: string;
   assistantEmail: string;
   mode: 'PERSONAL' | 'COMPARTIDA_CLINICA';
@@ -288,6 +319,34 @@ export interface AssistantAssignment {
   permissions: AssistantPermissions;
   allowedViews: ViewId[];
   active: boolean;
+}
+
+export interface ClinicAssignmentRecord {
+  id: string;
+  doctorId: string;
+  doctorName?: string;
+  assistantId?: string | null;
+  assistantName?: string | null;
+}
+
+export interface ClinicProfile {
+  id: string;
+  name: string;
+  rif?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  active: boolean;
+  assignments: ClinicAssignmentRecord[];
+}
+
+export interface BcvHistoryEntry {
+  id: number | string;
+  tasa: number;
+  origen: string;
+  recordedAt: string;
+  updatedByName?: string | null;
+  updatedByRole?: string | null;
 }
 
 export const ASSISTANT_GRANTABLE_VIEWS: { id: ViewId; label: string; description: string }[] = [

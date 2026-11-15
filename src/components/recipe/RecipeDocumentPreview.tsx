@@ -19,9 +19,17 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
   doctorSignature,
   activePage,
 }) => {
+  const isVerticalSplit = templateConfig.layoutMode !== 'classic';
+  const fontClass =
+    templateConfig.fontFamily === 'Serif Clásico'
+      ? 'font-serif'
+      : templateConfig.fontFamily === 'Monospace Clínico'
+        ? 'font-mono'
+        : 'font-sans';
+
   return (
     <div
-      className="bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between"
+      className={`bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between ${fontClass}`}
       style={{ borderTop: `5px solid ${templateConfig.borderColor}` }}
     >
       {activePage === 1 ? (
@@ -53,33 +61,95 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
                 {calculateExactAgeLabel(patient.birthDate)} · {consultation.weightKg} kg
               </span>
             </div>
-            <div className="col-span-2">
-              <span className="text-slate-400 block text-[11px]">Diagnóstico CIE-10</span>
-              <span className="font-semibold text-slate-900">
-                {consultation.cie10Code} — {consultation.cie10Name}
-              </span>
-            </div>
+            {templateConfig.showDiagnosisOnRecipe !== false && (
+              <div className="col-span-2">
+                <span className="text-slate-400 block text-[11px]">Diagnóstico CIE-10</span>
+                <span className="font-semibold text-slate-900">
+                  {consultation.cie10Code} — {consultation.cie10Name}
+                </span>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-3">
-            <div className="text-xs font-bold text-slate-900 tracking-tight border-b border-slate-200 pb-1.5">
-              RP / PRESCRIPCIÓN FARMACOLÓGICA E INDICACIONES
-            </div>
-            {consultation.prescriptions.map((rx, idx) => (
-              <div key={rx.id || idx} className="p-3.5 rounded-xl border border-slate-200/90 bg-white space-y-1">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-slate-900">
-                    {idx + 1}. {rx.medicationName}
-                  </span>
-                  <span className="text-xs font-mono text-slate-500">{rx.presentation}</span>
+          {isVerticalSplit ? (
+            <div className="rounded-xl border border-slate-300 overflow-hidden bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-300 min-h-[260px]">
+                {/* Lado Izquierdo: Medicina o Examen */}
+                <div className="p-4 space-y-3">
+                  <div className="text-[11px] font-bold text-slate-900 tracking-wide uppercase border-b border-slate-200 pb-1.5">
+                    {templateConfig.leftColumnTitle || 'RP / MEDICAMENTOS Y EXÁMENES'}
+                  </div>
+                  {consultation.prescriptions.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">Sin medicamentos o exámenes indicados.</p>
+                  ) : (
+                    <ol className="space-y-2.5">
+                      {consultation.prescriptions.map((rx, idx) => (
+                        <li key={rx.id || idx} className="text-xs space-y-0.5">
+                          <div className="font-bold text-slate-900">
+                            {idx + 1}. {rx.medicationName}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-mono pl-3">
+                            {rx.presentation}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </div>
-                <div className="text-xs font-mono font-semibold text-[#0284C7]">
-                  Dosis: {rx.dosePerTake} · {rx.frequencyHours} · {rx.durationDays}
+
+                {/* Lado Derecho: Instrucciones */}
+                <div className="p-4 space-y-3 bg-slate-50/40">
+                  <div className="text-[11px] font-bold text-slate-900 tracking-wide uppercase border-b border-slate-200 pb-1.5">
+                    {templateConfig.rightColumnTitle || 'INDICACIONES E INSTRUCCIONES'}
+                  </div>
+                  {consultation.prescriptions.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">Sin instrucciones registradas.</p>
+                  ) : (
+                    <ol className="space-y-2.5">
+                      {consultation.prescriptions.map((rx, idx) => (
+                        <li key={rx.id || idx} className="text-xs space-y-0.5">
+                          <div className="font-semibold text-[#0284C7]">
+                            {idx + 1}. {rx.dosePerTake} · c/{rx.frequencyHours}h · {rx.durationDays}d
+                          </div>
+                          {rx.specialInstructions && (
+                            <p className="text-[11px] text-slate-600 pl-3">
+                              {rx.specialInstructions}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {consultation.parentGuide && (
+                    <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-600">
+                      <span className="font-bold text-slate-800 block">Indicaciones generales:</span>
+                      {consultation.parentGuide}
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-slate-600">{rx.specialInstructions}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-xs font-bold text-slate-900 tracking-tight border-b border-slate-200 pb-1.5">
+                RP / PRESCRIPCIÓN FARMACOLÓGICA E INDICACIONES
+              </div>
+              {consultation.prescriptions.map((rx, idx) => (
+                <div key={rx.id || idx} className="p-3.5 rounded-xl border border-slate-200/90 bg-white space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-900">
+                      {idx + 1}. {rx.medicationName}
+                    </span>
+                    <span className="text-xs font-mono text-slate-500">{rx.presentation}</span>
+                  </div>
+                  <div className="text-xs font-mono font-semibold text-[#0284C7]">
+                    Dosis: {rx.dosePerTake} · {rx.frequencyHours} · {rx.durationDays}
+                  </div>
+                  <p className="text-xs text-slate-600">{rx.specialInstructions}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="pt-8 border-t border-slate-200 flex flex-wrap items-end justify-between gap-4">
             {templateConfig.showQrCode ? (

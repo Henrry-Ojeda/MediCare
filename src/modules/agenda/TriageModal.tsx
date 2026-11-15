@@ -9,26 +9,26 @@ export const TriageModal: React.FC = () => {
   const { currentUser } = useAuth();
   const { triageModalAppointment, closeTriageModal, saveTriageVitals, patients } = useClinical();
 
-  const [weightKg, setWeightKg] = useState('15.4');
-  const [heightCm, setHeightCm] = useState('98.5');
-  const [headCircumferenceCm, setHeadCircumferenceCm] = useState('49.5');
-  const [temperatureC, setTemperatureC] = useState('37.2');
-  const [heartRateBpm, setHeartRateBpm] = useState('104');
-  const [spo2Percent, setSpo2Percent] = useState('98');
-  const [systolicBp, setSystolicBp] = useState('96');
-  const [diastolicBp, setDiastolicBp] = useState('62');
+  const [weightKg, setWeightKg] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [headCircumferenceCm, setHeadCircumferenceCm] = useState('');
+  const [temperatureC, setTemperatureC] = useState('');
+  const [heartRateBpm, setHeartRateBpm] = useState('');
+  const [spo2Percent, setSpo2Percent] = useState('');
+  const [systolicBp, setSystolicBp] = useState('');
+  const [diastolicBp, setDiastolicBp] = useState('');
 
   useEffect(() => {
     if (triageModalAppointment) {
       const v = triageModalAppointment.triageVitals;
-      setWeightKg(String(v?.weightKg ?? 15.4));
-      setHeightCm(String(v?.heightCm ?? 98.5));
-      setHeadCircumferenceCm(String(v?.headCircumferenceCm ?? 49.5));
-      setTemperatureC(String(v?.temperatureC ?? 37.2));
-      setHeartRateBpm(String(v?.heartRateBpm ?? 104));
-      setSpo2Percent(String(v?.spo2Percent ?? 98));
-      setSystolicBp(String(v?.systolicBp ?? 96));
-      setDiastolicBp(String(v?.diastolicBp ?? 62));
+      setWeightKg(v?.weightKg ? String(v.weightKg) : '');
+      setHeightCm(v?.heightCm ? String(v.heightCm) : '');
+      setHeadCircumferenceCm(v?.headCircumferenceCm ? String(v.headCircumferenceCm) : '');
+      setTemperatureC(v?.temperatureC ? String(v.temperatureC) : '');
+      setHeartRateBpm(v?.heartRateBpm ? String(v.heartRateBpm) : '');
+      setSpo2Percent(v?.spo2Percent ? String(v.spo2Percent) : '');
+      setSystolicBp(v?.systolicBp ? String(v.systolicBp) : '');
+      setDiastolicBp(v?.diastolicBp ? String(v.diastolicBp) : '');
     }
   }, [triageModalAppointment]);
 

@@ -36,6 +36,16 @@ public sealed class AppointmentsController : ControllerBase
 
     public sealed record RescheduleAppointmentRequest(DateTime NewDate, string NewTime, string? Reason, Guid? DoctorUserId);
 
+    public sealed record UpdateAppointmentRequest(
+        DateTime Date,
+        string Time,
+        int DurationMinutes,
+        string Type,
+        string Reason,
+        Guid? DoctorUserId,
+        string? Stage
+    );
+
     public sealed record TriageRequest(
         decimal WeightKg,
         decimal HeightCm,
@@ -159,6 +169,93 @@ public sealed class AppointmentsController : ControllerBase
         );
 
         return Ok(updated);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAppointmentRequest req, CancellationToken ct)
+    {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+            return StatusCode(403, new { message = "El rol ADMIN no puede modificar citas clínicas." });
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var updated = await conn.QueryFirstOrDefaultAsync(
+            """
+            UPDATE dbo.TB_CITAS
+            SET AppointmentDate = @Date,
+                AppointmentTime = @Time,
+                DurationMinutes = @DurationMinutes,
+                AppointmentType = @Type,
+                Reason = @Reason,
+                DoctorUserId = COALESCE(@DoctorUserId, DoctorUserId),
+                Stage = COALESCE(@Stage, Stage),
+                UpdatedAt = GETDATE()
+            OUTPUT INSERTED.*
+            WHERE Id = @Id
+            """,
+            new
+            {
+                Id = id,
+                req.Date,
+                req.Time,
+                DurationMinutes = req.DurationMinutes > 0 ? req.DurationMinutes : 30,
+                Type = string.IsNullOrWhiteSpace(req.Type) ? "control" : req.Type,
+                req.Reason,
+                req.DoctorUserId,
+                req.Stage,
+            }
+        );
+
+        if (updated is null)
+            return NotFound(new { message = "Cita no encontrada." });
+
+        await _audit.RecordAsync(
+            conn, null, HttpContext, "Modificación de Cita",
+            "TB_CITAS", id.ToString(),
+            newValue: new { req.Date, req.Time, req.Type, req.Reason }
+        );
+
+        return Ok(updated);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase))
+            return StatusCode(403, new { message = "El rol ADMIN no puede eliminar citas clínicas." });
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            await conn.ExecuteAsync(
+                "DELETE FROM dbo.TB_SIGNOS_VITALES WHERE AppointmentId = @Id",
+                new { Id = id },
+                transaction: tx
+            );
+            var affected = await conn.ExecuteAsync(
+                "DELETE FROM dbo.TB_CITAS WHERE Id = @Id",
+                new { Id = id },
+                transaction: tx
+            );
+
+            if (affected == 0)
+            {
+                await tx.RollbackAsync(ct);
+                return NotFound(new { message = "Cita no encontrada." });
+            }
+
+            await _audit.RecordAsync(conn, tx, HttpContext, "Eliminación de Cita", "TB_CITAS", id.ToString());
+            await tx.CommitAsync(ct);
+            return Ok(new { ok = true });
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
     }
 
     [HttpPatch("{id:guid}/triage")]

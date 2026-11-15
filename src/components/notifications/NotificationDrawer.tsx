@@ -2,6 +2,7 @@ import React from 'react';
 import { X, CheckCheck, BellRing, AlertTriangle, Syringe, FileText, UserCheck } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationContext';
 import { useClinical } from '../../context/ClinicalContext';
+import { useAuth } from '../../context/AuthContext';
 import { NotificationCategory } from '../../types/notification.types';
 
 interface NotificationDrawerProps {
@@ -20,7 +21,8 @@ const CATEGORY_ICON: Record<NotificationCategory, React.ComponentType<{ classNam
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, onClose }) => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const { navigateToPatient360 } = useClinical();
+  const { navigateToPatient360, navigateToActiveConsultation } = useClinical();
+  const { userRole } = useAuth();
 
   if (!isOpen) return null;
 
@@ -72,7 +74,14 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({ isOpen, 
                   onClick={() => {
                     markAsRead(notif.id);
                     if (notif.patientId) {
-                      navigateToPatient360(notif.patientId);
+                      if (
+                        userRole === 'PEDIATRA' &&
+                        (notif.category === 'triage_ready' || notif.category === 'patient_arrived')
+                      ) {
+                        navigateToActiveConsultation(notif.patientId);
+                      } else {
+                        navigateToPatient360(notif.patientId);
+                      }
                       onClose();
                     }
                   }}

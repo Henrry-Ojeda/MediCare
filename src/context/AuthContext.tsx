@@ -7,10 +7,10 @@ const USER_STORAGE_KEY = 'medicare_current_user';
 const SIGNATURE_STORAGE_KEY = 'medicare_doctor_signature_v1';
 
 const DEFAULT_SIGNATURE: DoctorSignatureConfig = {
-  doctorName: 'Dra. Valeria Méndez',
+  doctorName: '',
   specialtyLabel: 'Pediatría y Puericultura',
-  mppsNumber: '68.412',
-  colegioNumber: '44.910',
+  mppsNumber: '',
+  colegioNumber: '',
   useDigitalSignature: true,
   useWetStamp: true,
 };
@@ -59,11 +59,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [doctorSignature, setDoctorSignature] = useState<DoctorSignatureConfig>(() => {
     try {
       const raw = localStorage.getItem(SIGNATURE_STORAGE_KEY);
-      if (raw) return { ...DEFAULT_SIGNATURE, ...JSON.parse(raw) };
+      if (raw) {
+        const parsed = JSON.parse(raw) as DoctorSignatureConfig;
+        return {
+          ...DEFAULT_SIGNATURE,
+          ...parsed,
+          doctorName: parsed.doctorName || currentUser?.name || '',
+        };
+      }
     } catch {
       // ignore
     }
-    return DEFAULT_SIGNATURE;
+    return {
+      ...DEFAULT_SIGNATURE,
+      doctorName: currentUser?.name || '',
+    };
   });
 
   useEffect(() => {
@@ -79,6 +89,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ? { ...user, role: user.role || mapRoleCodeToUserRole(user.roleCode) }
       : null;
     setCurrentUserState(normalized);
+    if (normalized?.name) {
+      setDoctorSignature((prev) =>
+        !prev.doctorName || prev.doctorName === 'Dra. Valeria Méndez'
+          ? { ...prev, doctorName: normalized.name }
+          : prev
+      );
+    }
     try {
       if (normalized) {
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(normalized));

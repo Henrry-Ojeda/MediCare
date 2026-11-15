@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -24,6 +26,124 @@ async function startServer() {
       service: "MediCare API",
       db,
     });
+  });
+
+  app.get("/api/system/network-info", (_req, res) => {
+    const nets = os.networkInterfaces();
+    const addresses: string[] = [];
+    for (const ifaceList of Object.values(nets)) {
+      if (!ifaceList) continue;
+      for (const iface of ifaceList) {
+        if (iface.family === "IPv4" && !iface.internal) {
+          addresses.push(iface.address);
+        }
+      }
+    }
+    const preferredIp =
+      addresses.find((ip) => ip.startsWith("192.168.")) ||
+      addresses.find((ip) => ip.startsWith("10.")) ||
+      addresses[0] ||
+      "localhost";
+    const apkPath =
+      [
+        path.join(__dirname, "public", "downloads", "MediCare.apk"),
+        path.join(__dirname, "android", "app", "build", "outputs", "apk", "release", "app-release.apk"),
+        path.join(__dirname, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"),
+      ].find((p) => fs.existsSync(p)) || "";
+    const apkAvailable = Boolean(apkPath);
+    const apkUpdatedAt = apkPath ? fs.statSync(apkPath).mtime.toISOString() : null;
+    let apkVersionCode = 1;
+    let apkVersionName = "1.0";
+    try {
+      const gradlePath = path.join(__dirname, "android", "app", "build.gradle");
+      if (fs.existsSync(gradlePath)) {
+        const gradleText = fs.readFileSync(gradlePath, "utf8");
+        const codeMatch = gradleText.match(/versionCode\s+(\d+)/);
+        const nameMatch = gradleText.match(/versionName\s+"([^"]+)"/);
+        if (codeMatch) apkVersionCode = Number(codeMatch[1]);
+        if (nameMatch) apkVersionName = nameMatch[1];
+      }
+    } catch {
+      // ignore gradle parse errors
+    }
+    const publicOrigin = process.env.PUBLIC_APP_URL?.replace(/\/$/, "");
+    const resolvedBaseUrl = publicOrigin || `http://${preferredIp}:${PORT}`;
+    res.json({
+      ip: preferredIp,
+      port: PORT,
+      url: resolvedBaseUrl,
+      publicUrl: publicOrigin || null,
+      apkAvailable,
+      apkVersionCode,
+      apkVersionName,
+      apkUpdatedAt,
+      downloadPageUrl: `${resolvedBaseUrl}/descargar`,
+      apkUrl: `${resolvedBaseUrl}/downloads/MediCare.apk`,
+      allIps: addresses,
+    });
+  });
+
+  app.get("/descargar", (_req, res) => {
+    const apkPath = [
+      path.join(__dirname, "public", "downloads", "MediCare.apk"),
+      path.join(__dirname, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"),
+    ].find((p) => fs.existsSync(p));
+    const sizeMb = apkPath ? (fs.statSync(apkPath).size / 1_000_000).toFixed(2) : null;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Descargar MediCare Android</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; min-height: 100vh; background: #f1f5f9; color: #0f172a; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { width: 100%; max-width: 420px; background: #fff; border-radius: 24px; padding: 28px 22px; box-shadow: 0 20px 45px rgba(15,23,42,.08); border: 1px solid #e2e8f0; }
+    .badge { display: inline-block; background: #ecfdf5; color: #047857; font-weight: 700; font-size: 12px; padding: 5px 12px; border-radius: 999px; margin-bottom: 12px; }
+    h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
+    p.sub { margin: 0 0 20px; color: #475569; font-size: 14px; line-height: 1.45; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 18px; border-radius: 14px; background: #059669; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 8px 20px rgba(5,150,105,.25); }
+    .btn.disabled { background: #94a3b8; pointer-events: none; box-shadow: none; }
+    .steps { margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px 16px; font-size: 13px; color: #334155; }
+    .steps strong { color: #0f172a; }
+    .steps ol { margin: 8px 0 0; padding-left: 18px; line-height: 1.55; }
+    .web-link { display: block; text-align: center; margin-top: 16px; font-size: 13px; color: #0284c7; font-weight: 600; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="badge">App Nativa Android (.apk)</span>
+    <h1>MediCare Pediatría</h1>
+    <p class="sub">${apkPath ? `Paquete listo para instalar (${sizeMb} MB).` : "El APK aún no ha sido compilado en el servidor."}</p>
+    <a class="btn ${apkPath ? "" : "disabled"}" href="/downloads/MediCare.apk">
+      ⬇ Descargar e Instalar MediCare.apk
+    </a>
+    <div class="steps">
+      <strong>Cómo instalar si no se abre solo:</strong>
+      <ol>
+        <li>Si la descarga llega al 100% y no abre el instalador, desliza la <strong>barra de notificaciones</strong> de tu teléfono y toca <strong>MediCare.apk</strong>.</li>
+        <li>O abre <strong>Mis Archivos → Descargas</strong> y toca <strong>MediCare.apk</strong>.</li>
+        <li>Si Android lo solicita, activa <strong>Permitir desde esta fuente</strong> e instala.</li>
+      </ol>
+    </div>
+    <a class="web-link" href="/">Abrir versión Web en el navegador →</a>
+  </div>
+</body>
+</html>`);
+  });
+
+  app.get("/downloads/MediCare.apk", (_req, res) => {
+    const apkPath = [
+      path.join(__dirname, "public", "downloads", "MediCare.apk"),
+      path.join(__dirname, "android", "app", "build", "outputs", "apk", "debug", "app-debug.apk"),
+    ].find((p) => fs.existsSync(p));
+    if (!apkPath) {
+      return res.status(404).json({ error: "APK_NOT_BUILT", message: "El archivo MediCare.apk aún no ha sido compilado." });
+    }
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "no-store");
+    res.download(apkPath, "MediCare.apk");
   });
 
   // Rutas REST de módulos clínicos (BD_MEDICARE)

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Calendar,
   Activity,
@@ -7,30 +7,222 @@ import {
   Stethoscope,
   Clock,
   ArrowRight,
-  BellRing,
+  Building2,
+  DollarSign,
+  History,
+  Lock,
+  Save,
+  ShieldCheck,
   UserPlus,
 } from 'lucide-react';
 import { KpiCard, Card, StatusBadge } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
-import { useNotifications } from '../../context/NotificationContext';
 
 export const DashboardView: React.FC = () => {
   const { currentUser, userRole } = useAuth();
   const {
     appointments,
     patients,
+    doctors,
+    assistants,
+    tenantConfig,
+    bcvHistory,
+    currentDoctorHasAssistant,
+    updateBcvRate,
     setCurrentView,
     openTriageModal,
     navigateToActiveConsultation,
     navigateToPatient360,
   } = useClinical();
-  const { callAssistantFromConsultorio } = useNotifications();
+  const [bcvInput, setBcvInput] = useState(String(tenantConfig.bcvRate));
 
-  const waitingPatients = appointments.filter(
+  useEffect(() => {
+    setBcvInput(String(tenantConfig.bcvRate));
+  }, [tenantConfig.bcvRate]);
+
+  const handleSaveBcv = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = Number(bcvInput);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    updateBcvRate(parsed);
+  };
+
+  const bcvPanel = (
+    <Card className="p-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+            <DollarSign className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Tasa BCV e Historial</h3>
+            <p className="text-[11px] text-slate-500">
+              Actualiza la tasa oficial BCV (Bs. / USD) y consulta el historial de cambios.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSaveBcv} className="flex items-center gap-2">
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            required
+            value={bcvInput}
+            onChange={(e) => setBcvInput(e.target.value)}
+            className="w-28 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800"
+          />
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5" /> Actualizar BCV
+          </button>
+        </form>
+      </div>
+
+      <div className="border-t border-slate-100 pt-3">
+        <p className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 mb-2">
+          <History className="w-3.5 h-3.5 text-slate-400" /> Historial de Modificaciones BCV
+        </p>
+        {bcvHistory.length === 0 ? (
+          <p className="text-xs text-slate-400">No hay modificaciones registradas todavía.</p>
+        ) : (
+          <div className="max-h-52 overflow-y-auto divide-y divide-slate-100">
+            {bcvHistory.map((item) => (
+              <div
+                key={item.id}
+                className="py-2 flex flex-wrap items-center justify-between gap-2 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-emerald-700">
+                    Bs. {Number(item.tasa).toFixed(2)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                    {item.origen}
+                  </span>
+                  {item.updatedByName && (
+                    <span className="text-slate-600">
+                      por <strong>{item.updatedByName}</strong>
+                      {item.updatedByRole ? ` (${item.updatedByRole})` : ''}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  {new Date(item.recordedAt).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+
+  if (userRole === 'ADMIN') {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+              Hola, {currentUser?.name || 'Administrador'}
+            </h2>
+            <p className="text-xs text-slate-500">
+              Panel Administrativo · Gestión de Doctores, Asistentes, Permisos y Configuración
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setCurrentView('admin-doctores')}
+              className="px-3.5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Stethoscope className="w-4 h-4" />
+              <span>Doctores</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('admin-asistentes')}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Users className="w-4 h-4 text-violet-600" />
+              <span>Asistentes</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('admin-clinicas')}
+              className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="w-4 h-4 text-emerald-600" />
+              <span>Clínicas</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3 text-xs text-amber-900">
+          <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Alcance del Perfil Administrador</p>
+            <p className="text-amber-800 mt-0.5">
+              El Administrador gestiona perfiles de Doctores, Asistentes y sus permisos, pero no puede crear pacientes ni acceder o modificar el módulo clínico de Pediatría.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <KpiCard
+            title="Doctores Activos"
+            value={doctors.length}
+            subtitle="Pediatría"
+            icon={<Stethoscope className="w-4 h-4" />}
+            accentClass="bg-sky-50 text-[#0284C7]"
+          />
+          <KpiCard
+            title="Asistentes Activos"
+            value={assistants.length}
+            subtitle="Asignación M:N"
+            icon={<Users className="w-4 h-4" />}
+            accentClass="bg-violet-50 text-violet-600"
+          />
+          <KpiCard
+            title="Tasa BCV"
+            value={`Bs. ${tenantConfig.bcvRate.toFixed(2)}`}
+            subtitle="Referencia clínica"
+            icon={<Activity className="w-4 h-4" />}
+            accentClass="bg-emerald-50 text-emerald-600"
+          />
+          <KpiCard
+            title="Módulo Pediatría"
+            value="Bloqueado"
+            subtitle="Solo lectura clínica médica"
+            icon={<ShieldCheck className="w-4 h-4" />}
+            accentClass="bg-amber-50 text-amber-700"
+          />
+        </div>
+
+        {bcvPanel}
+      </div>
+    );
+  }
+
+  const doctorAppointments =
+    userRole === 'PEDIATRA'
+      ? appointments.filter(
+          (a) =>
+            Boolean(a.doctorId) &&
+            (a.doctorId === currentUser?.id ||
+              (a.doctorName &&
+                currentUser?.name &&
+                a.doctorName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()))
+        )
+      : appointments;
+
+  const waitingPatients = doctorAppointments.filter(
     (a) => a.stage === 'en_sala' || a.stage === 'en_triaje' || a.stage === 'en_consulta'
   );
-  const completedToday = appointments.filter((a) => a.stage === 'completado').length;
+  const completedToday = doctorAppointments.filter((a) => a.stage === 'completado').length;
   const pendingVaccinesCount = patients.reduce(
     (acc, p) => acc + p.vaccines.filter((v) => v.status === 'pendiente').length,
     0
@@ -44,21 +236,11 @@ export const DashboardView: React.FC = () => {
             Hola, {currentUser?.name || 'Equipo Médico'}
           </h2>
           <p className="text-xs text-slate-500">
-            Resumen operativo de Pediatría · {appointments.length} citas registradas hoy
+            Resumen operativo de Pediatría · {doctorAppointments.length} citas registradas hoy
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {userRole === 'PEDIATRA' && (
-            <button
-              type="button"
-              onClick={() => callAssistantFromConsultorio('Acudir al consultorio')}
-              className="px-3.5 py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-            >
-              <BellRing className="w-4 h-4 text-amber-600" />
-              <span>Llamar Asistente</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={() => setCurrentView('paciente-nuevo')}
@@ -67,14 +249,25 @@ export const DashboardView: React.FC = () => {
             <UserPlus className="w-4 h-4 text-[#0284C7]" />
             <span>Nuevo Paciente</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setCurrentView('sala-espera')}
-            className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-          >
-            <Activity className="w-4 h-4" />
-            <span>Abrir Sala de Espera</span>
-          </button>
+          {userRole === 'PEDIATRA' && !currentDoctorHasAssistant ? (
+            <button
+              type="button"
+              onClick={() => setCurrentView('pacientes')}
+              className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Stethoscope className="w-4 h-4" />
+              <span>Buscar Paciente</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCurrentView('sala-espera')}
+              className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Abrir Sala de Espera</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -82,7 +275,7 @@ export const DashboardView: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           title="Citas de Hoy"
-          value={appointments.length}
+          value={doctorAppointments.length}
           subtitle={`${completedToday} atendidas`}
           icon={<Calendar className="w-4 h-4" />}
           accentClass="bg-sky-50 text-[#0284C7]"
@@ -111,7 +304,47 @@ export const DashboardView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Cola en vivo de Sala de Espera */}
+        {/* Cola en vivo de Sala de Espera o Atención Directa sin Asistente */}
+        {userRole === 'PEDIATRA' && !currentDoctorHasAssistant ? (
+          <Card className="lg:col-span-7 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Atención Directa (Sin Asistente)</h3>
+                <p className="text-xs text-slate-500">
+                  No tiene asistente asignado; la sala de espera digital no está activa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentView('agenda')}
+                className="text-xs font-semibold text-[#0284C7] hover:underline cursor-pointer"
+              >
+                Ver Agenda →
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3 text-center">
+              <p className="text-xs text-slate-600">
+                Los pacientes pasan en orden de llegada uno a uno. Busque directamente al paciente para abrir su historial o iniciar la consulta.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('pacientes')}
+                  className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+                >
+                  Buscar en Directorio de Pacientes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('consulta-activa')}
+                  className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold cursor-pointer"
+                >
+                  Ir a Consulta
+                </button>
+              </div>
+            </div>
+          </Card>
+        ) : (
         <Card className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
@@ -191,6 +424,7 @@ export const DashboardView: React.FC = () => {
             </div>
           )}
         </Card>
+        )}
 
         {/* Próximas citas / Pacientes recientes */}
         <Card className="lg:col-span-5 space-y-4">
@@ -234,6 +468,8 @@ export const DashboardView: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {userRole === 'ASISTENTE' && bcvPanel}
     </div>
   );
 };

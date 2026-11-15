@@ -2,3 +2,8 @@ export { SignaturePadCanvas } from './SignaturePadCanvas';
 export { DoctorSignatureView } from './DoctorSignatureView';
 export { ClinicSettingsView } from './ClinicSettingsView';
 export { RecipeTemplateDesignerView } from './RecipeTemplateDesignerView';
+export { AdminUsersView } from './AdminUsersView';
+export { AdminDoctorsView } from './AdminDoctorsView';
+export { AdminAssistantsView } from './AdminAssistantsView';
+export { AdminClinicsView } from './AdminClinicsView';
+export { UserProfileView } from './UserProfileView';

@@ -15,11 +15,16 @@ export interface AuthUser {
   id: string;
   username?: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string;
+  phone?: string;
   email: string;
   role: UserRole;
   roleCode: string;
   roleName: string;
   esSuperAdmin?: boolean;
+  avatarUrl?: string;
   specialty?: string;
   licenseNumber?: string;
 }

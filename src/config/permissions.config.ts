@@ -12,6 +12,8 @@ export interface RolePermissionRule {
   canManageUsers: boolean;
   canEditDoctorSignature: boolean;
   canManageSchedule: boolean;
+  canCreatePatient: boolean;
+  canEditPediatricsModule: boolean;
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
@@ -28,6 +30,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
       'vacunas-catalogo',
       'consulta-activa',
       'firma-medico',
+      'plantillas',
       'perfil',
     ],
     canCallAssistant: true,
@@ -37,6 +40,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
     canManageUsers: false,
     canEditDoctorSignature: true,
     canManageSchedule: true,
+    canCreatePatient: true,
+    canEditPediatricsModule: true,
   },
   ASISTENTE: {
     defaultView: 'dashboard',
@@ -57,20 +62,18 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
     canManageUsers: false,
     canEditDoctorSignature: false,
     canManageSchedule: true,
+    canCreatePatient: true,
+    canEditPediatricsModule: false,
   },
   ADMIN: {
     defaultView: 'dashboard',
     allowedViews: [
       'dashboard',
-      'agenda',
-      'sala-espera',
-      'pacientes',
-      'paciente-detalle',
-      'paciente-nuevo',
-      'vacunas-carnet',
-      'vacunas-catalogo',
-      'configuracion',
       'admin-usuarios',
+      'admin-doctores',
+      'admin-asistentes',
+      'admin-clinicas',
+      'configuracion',
       'perfil',
     ],
     canCallAssistant: false,
@@ -79,7 +82,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
     canApplyVaccine: false,
     canManageUsers: true,
     canEditDoctorSignature: false,
-    canManageSchedule: true,
+    canManageSchedule: false,
+    canCreatePatient: false,
+    canEditPediatricsModule: false,
   },
 };
 
@@ -94,7 +99,7 @@ const FEATURE_GATED_VIEWS: Partial<Record<ViewId, boolean>> = {
   epidemiologia: FEATURE_FLAGS.enableAdvancedReports,
   auditoria: FEATURE_FLAGS.enableAuditLog,
   onboarding: FEATURE_FLAGS.enableOnboarding,
-  plantillas: FEATURE_FLAGS.enableWysiwygTemplateDesigner,
+  plantillas: true,
 };
 
 export function isViewEnabledInSprint(viewId: ViewId): boolean {

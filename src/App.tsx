@@ -6,7 +6,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { TriageModal } from './modules/agenda';
 import { ApplyVaccineDoseModal } from './modules/especialidades/pediatria';
 import { RecipeDispatchModal } from './components/recipe/RecipeDispatchModal';
-import { isViewEnabledInSprint } from './config/permissions.config';
+import { canRoleAccessView, isViewEnabledInSprint } from './config/permissions.config';
 
 // Auth Views
 const LoginView = lazy(() => import('./modules/auth').then((m) => ({ default: m.LoginView })));
@@ -52,6 +52,21 @@ const DoctorSignatureView = lazy(() =>
 const ClinicSettingsView = lazy(() =>
   import('./modules/firma-y-config').then((m) => ({ default: m.ClinicSettingsView }))
 );
+const AdminUsersView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.AdminUsersView }))
+);
+const AdminDoctorsView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.AdminDoctorsView }))
+);
+const AdminAssistantsView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.AdminAssistantsView }))
+);
+const AdminClinicsView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.AdminClinicsView }))
+);
+const UserProfileView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.UserProfileView }))
+);
 
 // Sprint 2 Hidden Views (conservadas y listas para habilitar por featureFlags)
 const RecipeTemplateDesignerView = lazy(() =>
@@ -84,7 +99,7 @@ const ViewLoadingFallback: React.FC = () => (
 );
 
 const AuthenticatedRouter: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userRole } = useAuth();
   const { currentView, setCurrentView } = useClinical();
 
   if (!isAuthenticated) {
@@ -102,7 +117,10 @@ const AuthenticatedRouter: React.FC = () => {
   }
 
   const renderActiveView = () => {
-    if (!isViewEnabledInSprint(currentView) && currentView !== 'dashboard') {
+    if (
+      (!isViewEnabledInSprint(currentView) || !canRoleAccessView(userRole, currentView)) &&
+      currentView !== 'dashboard'
+    ) {
       return <DashboardView />;
     }
 
@@ -126,10 +144,18 @@ const AuthenticatedRouter: React.FC = () => {
       case 'vacunas-catalogo':
         return <VaccineCatalogView />;
       case 'firma-medico':
-      case 'perfil':
         return <DoctorSignatureView />;
-      case 'configuracion':
+      case 'perfil':
+        return <UserProfileView />;
       case 'admin-usuarios':
+        return <AdminUsersView />;
+      case 'admin-doctores':
+        return <AdminDoctorsView />;
+      case 'admin-asistentes':
+        return <AdminAssistantsView />;
+      case 'admin-clinicas':
+        return <AdminClinicsView />;
+      case 'configuracion':
         return <ClinicSettingsView />;
       case 'plantillas':
         return <RecipeTemplateDesignerView />;

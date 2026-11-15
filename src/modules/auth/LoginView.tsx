@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { ShieldCheck, Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, RefreshCw, QrCode, Stethoscope } from 'lucide-react';
+import { MobileAppQrModal } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -17,6 +19,7 @@ export const LoginView: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const completeLogin = (user: AuthUser) => {
     setCurrentUser(user);
@@ -88,18 +91,30 @@ export const LoginView: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-center p-5 sm:p-10 bg-[#F8FAFC]">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 lg:hidden mb-2">
-              <div className="w-8 h-8 rounded-xl bg-[#0284C7] flex items-center justify-center text-white font-bold text-sm">
-                M
-              </div>
-              <span className="font-bold text-base text-slate-900">MediCare Pediatría</span>
+      <div className="flex flex-col items-center justify-center p-5 sm:p-10 bg-gradient-to-br from-[#0369A1] via-[#0284C7] to-[#0D9488] lg:from-[#E0F2FE]/80 lg:via-[#F0F9FF] lg:to-[#CCFBF1]/60">
+        <div className="lg:hidden w-full max-w-md mb-5 flex items-center justify-between text-white px-1">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg">
+              <Stethoscope className="w-6 h-6 text-white" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Iniciar Sesión</h2>
+            <div>
+              <div className="font-extrabold text-lg tracking-tight leading-tight">MediCare</div>
+              <div className="text-[11px] font-medium text-sky-100">Pediatría & Consultorio Digital</div>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 border border-white/25 text-[10px] font-bold text-white">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-200" />
+            Seguro
+          </span>
+        </div>
+
+        <div className="w-full max-w-md bg-white/95 backdrop-blur-md rounded-3xl border border-sky-100/80 overflow-hidden shadow-2xl shadow-sky-950/20">
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#0284C7] via-[#0EA5E9] to-[#14B8A6]" />
+          <div className="p-6 sm:p-8 space-y-6">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">Iniciar Sesión</h2>
             <p className="text-xs text-slate-500">
-              Disponible en Laptop, Tablet y Teléfono Móvil.
+              Accede a tu agenda, sala de espera y consultas clínicas.
             </p>
           </div>
 
@@ -119,9 +134,11 @@ export const LoginView: React.FC = () => {
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
+                  autoComplete="username"
+                  placeholder="Ej. dr.perez o correo@clinica.com"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-sky-50/40 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 focus:outline-none"
                 />
               </div>
             </div>
@@ -134,9 +151,11 @@ export const LoginView: React.FC = () => {
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:outline-none"
+                  className="w-full pl-10 pr-10 py-2.5 text-xs font-medium bg-sky-50/40 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:border-[#0284C7] focus:ring-2 focus:ring-sky-500/20 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -151,7 +170,7 @@ export const LoginView: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 px-4 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#0284C7] to-[#0D9488] hover:from-[#0369A1] hover:to-[#0F766E] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-sky-600/25 cursor-pointer disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -166,8 +185,24 @@ export const LoginView: React.FC = () => {
               )}
             </button>
           </form>
+
+          {!Capacitor.isNativePlatform() && (
+            <div className="pt-3 border-t border-slate-100 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowQrModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-xs font-bold text-sky-800 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 text-sky-600" />
+                <span>Abrir / Instalar App en el Teléfono (QR)</span>
+              </button>
+            </div>
+          )}
+          </div>
         </div>
       </div>
+
+      <MobileAppQrModal isOpen={showQrModal} onClose={() => setShowQrModal(false)} />
     </div>
   );
 };

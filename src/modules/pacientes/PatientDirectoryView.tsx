@@ -3,6 +3,7 @@ import { UserPlus, Phone, Syringe, FileText, Stethoscope } from 'lucide-react';
 import { DataTable, AllergyAlertBadge } from '../../components/common';
 import { useClinical } from '../../context/ClinicalContext';
 import { useAuth } from '../../context/AuthContext';
+import { ROLE_PERMISSIONS } from '../../config/permissions.config';
 import { Patient } from '../../types/medical';
 import { calculateExactAgeLabel } from '../../utils/pediatricCalculations';
 import { normalizeWhatsappPhone } from '../../utils/whatsappFormatter';
@@ -36,14 +37,16 @@ export const PatientDirectoryView: React.FC = () => {
         pageSize={8}
         emptyMessage="No se encontraron pacientes pediátricos con ese criterio."
         headerActions={
-          <button
-            type="button"
-            onClick={() => setCurrentView('paciente-nuevo')}
-            className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Nuevo Paciente</span>
-          </button>
+          ROLE_PERMISSIONS[userRole].canCreatePatient ? (
+            <button
+              type="button"
+              onClick={() => setCurrentView('paciente-nuevo')}
+              className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Nuevo Paciente</span>
+            </button>
+          ) : undefined
         }
         columns={[
           {

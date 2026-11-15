@@ -1,17 +1,9 @@
 {
-  "name": "MediCare Pediatría — Consultorio & App Móvil",
+  "name": "MediCare Pediatría",
   "short_name": "MediCare",
-  "description": "Plataforma clínica pediátrica con Agenda, Sala de Espera, Dictado IA, Récipe por WhatsApp y Notificaciones en tiempo real.",
+  "description": "Sistema Clínico Pediátrico y Notificaciones en Tiempo Real",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#0284C7",
-  "orientation": "any",
-  "icons": [
-    {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    }
-  ]
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7"
 }

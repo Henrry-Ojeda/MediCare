@@ -100,8 +100,34 @@ public sealed class PaymentsController : ControllerBase
         return StatusCode(201, created);
     }
 
+    [HttpGet("bcv-history")]
+    public async Task<IActionResult> GetBcvHistory(CancellationToken ct)
+    {
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var rows = (await conn.QueryAsync<dynamic>(
+            """
+            SELECT TOP 50 h.Id, h.Tasa, h.Origen, h.RecordedAt,
+                   u.NombreCompleto AS UpdatedByName,
+                   r.Nombre AS UpdatedByRole
+            FROM dbo.TB_HISTORIAL_BCV h
+            LEFT JOIN dbo.TB_USUARIOS u ON u.Id = h.UpdatedByUserId
+            LEFT JOIN dbo.TB_ROLES r ON r.Id = u.RoleId
+            ORDER BY h.RecordedAt DESC, h.Id DESC
+            """
+        )).Select(h => new
+        {
+            id = (int)h.Id,
+            tasa = (decimal)h.Tasa,
+            origen = (string)h.Origen,
+            recordedAt = (DateTime)h.RecordedAt,
+            updatedByName = (string?)h.UpdatedByName,
+            updatedByRole = (string?)h.UpdatedByRole,
+        });
+        return Ok(rows);
+    }
+
     [HttpPatch("bcv-rate")]
-    [Authorize(Roles = "SUPERADMIN,ADMIN,RECEPCION")]
+    [Authorize(Roles = "SUPERADMIN,ADMIN,ASISTENTE,RECEPCION")]
     public async Task<IActionResult> UpdateBcvRate([FromBody] UpdateBcvRequest req, CancellationToken ct)
     {
         await using var conn = await _db.CreateOpenConnectionAsync(ct);

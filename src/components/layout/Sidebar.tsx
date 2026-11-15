@@ -14,6 +14,7 @@ import {
   Wallet,
   CreditCard,
   BarChart3,
+  Building2,
   ShieldCheck,
 } from 'lucide-react';
 import { ViewId } from '../../types/medical';
@@ -48,9 +49,6 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     label: 'Pacientes y Pediatría',
     items: [
       { id: 'pacientes', label: 'Pacientes', icon: Users },
-      { id: 'paciente-detalle', label: 'Historial 360°', icon: FileText },
-      { id: 'vacunas-carnet', label: 'Vacunación', icon: Syringe },
-      { id: 'consulta-activa', label: 'Consulta + Dictado', icon: Sparkles, highlightAi: true },
     ],
   },
   {
@@ -58,7 +56,12 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'vacunas-catalogo', label: 'Catálogo Vacunas', icon: Syringe },
       { id: 'firma-medico', label: 'Firma del Médico', icon: FileSignature },
+      { id: 'plantillas', label: 'Personalizar Récipe', icon: FileText },
+      { id: 'admin-doctores', label: 'Doctores', icon: Users },
+      { id: 'admin-asistentes', label: 'Asistentes', icon: Users },
+      { id: 'admin-clinicas', label: 'Clínicas', icon: Building2 },
       { id: 'configuracion', label: 'Clínica y Roles', icon: Settings },
+      { id: 'perfil', label: 'Mi Perfil', icon: ShieldCheck },
     ],
   },
   {
@@ -80,11 +83,17 @@ const ROLE_BADGE_STYLE: Record<UserRole, { label: string; className: string }> =
 
 export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) => {
   const { currentUser, userRole, logout } = useAuth();
-  const { currentView, setCurrentView } = useClinical();
+  const { currentView, setCurrentView, currentDoctorHasAssistant } = useClinical();
 
   const visibleSections = NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => canRoleAccessView(userRole, item.id)),
+    items: section.items.filter((item) => {
+      if (!canRoleAccessView(userRole, item.id)) return false;
+      if (item.id === 'sala-espera' && userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
+        return false;
+      }
+      return true;
+    }),
   })).filter((section) => section.items.length > 0);
 
   const handleNavigate = (viewId: ViewId) => {
@@ -175,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-semibold text-slate-900 truncate">
-                  {currentUser?.name || 'Dra. Valeria Méndez'}
+                  {currentUser?.name || 'Usuario'}
                 </p>
                 <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded shrink-0 ${badge.className}`}>
                   {badge.label}

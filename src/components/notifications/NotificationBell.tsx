@@ -4,9 +4,10 @@ import { useNotifications } from '../../context/NotificationContext';
 
 interface NotificationBellProps {
   onClick: () => void;
+  className?: string;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ onClick }) => {
+export const NotificationBell: React.FC<NotificationBellProps> = ({ onClick, className }) => {
   const { unreadCount } = useNotifications();
 
   return (
@@ -14,7 +15,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onClick }) =
       type="button"
       onClick={onClick}
       aria-label="Abrir centro de notificaciones"
-      className="relative p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 transition-colors cursor-pointer"
+      className={
+        className ||
+        'relative p-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white transition-colors cursor-pointer'
+      }
     >
       <Bell className="w-4 h-4" />
       {unreadCount > 0 && (

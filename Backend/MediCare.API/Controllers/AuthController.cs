@@ -51,7 +51,7 @@ public sealed class AuthController : ControllerBase
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
         var user = await conn.QueryFirstOrDefaultAsync<dynamic>(
             """
-            SELECT u.Id, u.Username, u.NombreCompleto, u.Email, u.PasswordHash, u.Activo,
+            SELECT u.Id, u.Username, u.NombreCompleto, u.Email, u.PasswordHash, u.AvatarUrl, u.Activo,
                    r.Codigo AS RoleCodigo, r.Nombre AS RoleNombre
             FROM dbo.TB_USUARIOS u
             INNER JOIN dbo.TB_ROLES r ON r.Id = u.RoleId
@@ -103,6 +103,7 @@ public sealed class AuthController : ControllerBase
                 username = (string)user.Username,
                 name = (string)user.NombreCompleto,
                 email = (string?)user.Email ?? string.Empty,
+                avatarUrl = (string?)user.AvatarUrl,
                 roleCode,
                 roleName = (string)user.RoleNombre,
                 esSuperAdmin,

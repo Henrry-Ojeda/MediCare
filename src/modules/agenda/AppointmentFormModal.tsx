@@ -14,6 +14,7 @@ export const AppointmentFormModal: React.FC<AppointmentFormModalProps> = ({ isOp
   const { patients, doctors, addAppointment } = useClinical();
 
   const [patientId, setPatientId] = useState(patients[0]?.id || 'pat-1');
+  const [doctorId, setDoctorId] = useState(doctors[0]?.id || '');
   const [date, setDate] = useState(getTodayIsoDate());
   const [time, setTime] = useState('02:30 PM');
   const [type, setType] = useState<AppointmentType>('control');
@@ -22,7 +23,8 @@ export const AppointmentFormModal: React.FC<AppointmentFormModalProps> = ({ isOp
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const pat = patients.find((p) => p.id === patientId) || patients[0];
-    const doc = doctors[0];
+    if (!pat) return;
+    const doc = doctors.find((d) => d.id === doctorId) || doctors[0];
     addAppointment({
       patientId: pat.id,
       patientName: `${pat.firstName} ${pat.lastName}`,
@@ -30,7 +32,7 @@ export const AppointmentFormModal: React.FC<AppointmentFormModalProps> = ({ isOp
       guardianName: pat.guardianName,
       guardianWhatsapp: pat.guardianWhatsapp,
       doctorId: doc?.id,
-      doctorName: doc?.name || 'Dra. Valeria Méndez',
+      doctorName: doc?.name || 'Pediatra por asignar',
       specialty: 'Pediatría',
       date,
       time,
@@ -59,6 +61,25 @@ export const AppointmentFormModal: React.FC<AppointmentFormModalProps> = ({ isOp
             ))}
           </select>
         </div>
+
+        {doctors.length > 0 && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Médico Asignado
+            </label>
+            <select
+              value={doctorId || doctors[0]?.id || ''}
+              onChange={(e) => setDoctorId(e.target.value)}
+              className="w-full px-3.5 py-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl"
+            >
+              {doctors.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.specialty})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

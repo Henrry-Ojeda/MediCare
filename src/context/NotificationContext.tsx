@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   AppNotification,
   AssistantCallAlert,
@@ -9,6 +9,8 @@ import { UserRole } from '../types/auth.types';
 import { useAuth } from './AuthContext';
 import { playClinicalChime, triggerBrowserNotification } from '../utils/soundAndVibrate';
 import { getCurrentTimeLabel } from '../utils/formatters';
+import { medicareApi } from '../api/medicareApi';
+import { getAuthToken } from '../api/client';
 
 const NOTIFICATIONS_STORAGE_KEY = 'medicare_notifications_v1';
 const ASSISTANT_CALL_STORAGE_KEY = 'medicare_assistant_call_v1';
@@ -38,34 +40,14 @@ interface NotificationContextValue {
 
 const NotificationContext = createContext<NotificationContextValue | undefined>(undefined);
 
-const INITIAL_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-init-1',
-    title: 'Paciente con Triaje Listo',
-    message: 'Mateo Rojas (38.4 °C · 15.4 kg) completó triaje y espera en consultorio.',
-    category: 'triage_ready',
-    priority: 'high',
-    targetRoles: ['PEDIATRA', 'ADMIN'],
-    createdAt: '09:15 AM',
-    read: false,
-    patientId: 'pat-1',
-  },
-  {
-    id: 'notif-init-2',
-    title: 'Recordatorio de Vacunación',
-    message: 'Camila Valentina tiene pendiente refuerzo de Hexavalente (18 meses).',
-    category: 'vaccine_alert',
-    priority: 'normal',
-    targetRoles: ['PEDIATRA', 'ASISTENTE'],
-    createdAt: '09:00 AM',
-    read: false,
-    patientId: 'pat-2',
-  },
-];
+const INITIAL_NOTIFICATIONS: AppNotification[] = [];
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { userRole, currentUser } = useAuth();
+  const { userRole, currentUser, isAuthenticated } = useAuth();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const lastAlertedCallIdRef = useRef<string | null>(null);
+  const seenNotifIdsRef = useRef<Set<string>>(new Set());
+  const initialSyncDoneRef = useRef(false);
 
   const [allNotifications, setAllNotifications] = useState<AppNotification[]>(() => {
     try {
@@ -116,6 +98,90 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [activeAssistantCall]);
 
+  // Solicitar permiso de notificaciones push (escritorio / móvil) al iniciar sesión
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, [isAuthenticated]);
+
+  // Sincronización en tiempo real vía API (.NET + SQL Server) cada 2.5s entre dispositivos y navegadores
+  useEffect(() => {
+    if (!isAuthenticated || !getAuthToken()) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await medicareApi.getNotifications();
+        if (cancelled) return;
+
+        const mappedNotifs: AppNotification[] = (res.notifications || []).map((n) => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          category: n.category as NotificationCategory,
+          priority: n.priority,
+          targetRoles: n.targetRoles as UserRole[],
+          createdAt: n.createdAt,
+          read: n.read,
+          patientId: n.patientId,
+          appointmentId: n.appointmentId,
+        }));
+
+        if (initialSyncDoneRef.current) {
+          for (const n of mappedNotifs) {
+            if (!seenNotifIdsRef.current.has(n.id) && !n.read && n.targetRoles.includes(userRole)) {
+              playClinicalChime(n.priority === 'urgent' ? 'assistant_urgent' : 'notification');
+              triggerBrowserNotification(n.title, n.message);
+            }
+          }
+        }
+        mappedNotifs.forEach((n) => seenNotifIdsRef.current.add(n.id));
+        initialSyncDoneRef.current = true;
+        setAllNotifications(mappedNotifs);
+
+        const remoteCall = res.activeAssistantCall;
+        setActiveAssistantCall(remoteCall);
+
+        if (
+          remoteCall &&
+          remoteCall.status === 'PENDIENTE' &&
+          userRole === 'ASISTENTE' &&
+          lastAlertedCallIdRef.current !== remoteCall.id
+        ) {
+          lastAlertedCallIdRef.current = remoteCall.id;
+          playClinicalChime('assistant_urgent');
+          triggerBrowserNotification(
+            `Llamado desde ${remoteCall.consultorioLabel}`,
+            `${remoteCall.requestedByDoctor}: ${remoteCall.reason}`
+          );
+        }
+        if (!remoteCall) {
+          lastAlertedCallIdRef.current = null;
+        }
+      } catch {
+        // ignore transient network errors
+      }
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isAuthenticated, userRole]);
+
+  // Repetición de timbre cada 8s mientras el llamado siga PENDIENTE en la vista de Asistente
+  useEffect(() => {
+    if (userRole !== 'ASISTENTE' || activeAssistantCall?.status !== 'PENDIENTE') return;
+    const timer = window.setInterval(() => {
+      playClinicalChime('assistant_urgent');
+    }, 8000);
+    return () => window.clearInterval(timer);
+  }, [userRole, activeAssistantCall?.status]);
+
   // Sincronización en tiempo real entre pestañas/ventanas (ej. Pediatra en una y Asistente en otra)
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return;
@@ -165,8 +231,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         patientId,
         appointmentId,
       };
+      seenNotifIdsRef.current.add(created.id);
       setAllNotifications((prev) => [created, ...prev.slice(0, 49)]);
       broadcastEvent('NEW_NOTIFICATION', created);
+      if (getAuthToken()) {
+        medicareApi
+          .createNotification({
+            title,
+            message,
+            category,
+            priority,
+            targetRoles,
+            patientId,
+            appointmentId,
+          })
+          .catch(() => {});
+      }
       if (targetRoles.includes(userRole)) {
         playClinicalChime(priority === 'urgent' ? 'assistant_urgent' : 'notification');
       }
@@ -176,18 +256,24 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAsRead = (id: string) => {
     setAllNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (getAuthToken()) {
+      medicareApi.markNotificationRead(id).catch(() => {});
+    }
   };
 
   const markAllAsRead = () => {
     setAllNotifications((prev) =>
       prev.map((n) => (n.targetRoles.includes(userRole) ? { ...n, read: true } : n))
     );
+    if (getAuthToken()) {
+      medicareApi.markAllNotificationsRead().catch(() => {});
+    }
   };
 
   const callAssistantFromConsultorio = (reason: string, patientName?: string) => {
     const alert: AssistantCallAlert = {
       id: `call-${Date.now()}`,
-      requestedByDoctor: currentUser?.name || 'Dra. Valeria Méndez',
+      requestedByDoctor: currentUser?.name || 'Médico',
       consultorioLabel: 'Consultorio Pediátrico 1',
       reason,
       patientName,
@@ -196,13 +282,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
     setActiveAssistantCall(alert);
     broadcastEvent('ASSISTANT_CALL_UPDATED', alert);
-    pushNotification({
-      title: 'Llamado desde Consultorio',
-      message: `${alert.requestedByDoctor}: ${reason}${patientName ? ` (${patientName})` : ''}`,
-      category: 'assistant_call',
-      priority: 'urgent',
-      targetRoles: ['ASISTENTE', 'ADMIN'],
-    });
+    if (getAuthToken()) {
+      medicareApi
+        .callAssistant({
+          reason,
+          patientName,
+          consultorioLabel: alert.consultorioLabel,
+        })
+        .catch(() => {});
+    } else {
+      pushNotification({
+        title: 'Llamado desde Consultorio',
+        message: `${alert.requestedByDoctor}: ${reason}${patientName ? ` (${patientName})` : ''}`,
+        category: 'assistant_call',
+        priority: 'urgent',
+        targetRoles: ['ASISTENTE', 'ADMIN'],
+      });
+    }
     playClinicalChime('assistant_urgent');
     showToast('Llamado enviado a la Asistente en tiempo real');
   };
@@ -217,6 +313,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
     setActiveAssistantCall(updated);
     broadcastEvent('ASSISTANT_CALL_UPDATED', updated);
+    if (getAuthToken()) {
+      medicareApi.acknowledgeAssistantCall().catch(() => {});
+    }
     pushNotification({
       title: 'Asistente en Camino',
       message: `${updated.acknowledgedBy} confirmó el llamado y se dirige al consultorio.`,
@@ -230,6 +329,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const dismissAssistantCall = () => {
     setActiveAssistantCall(null);
     broadcastEvent('ASSISTANT_CALL_UPDATED', null);
+    if (getAuthToken()) {
+      medicareApi.dismissAssistantCall().catch(() => {});
+    }
   };
 
   const notifications = allNotifications.filter((n) => n.targetRoles.includes(userRole));

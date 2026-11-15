@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Calendar, Phone, Stethoscope, Syringe, User } from 'lucide-react';
+import { ArrowLeft, Calendar, Phone, Pill, Stethoscope, Syringe, User } from 'lucide-react';
 import { Patient } from '../../../../types/medical';
 import { calculateExactAgeLabel } from '../../../../utils/pediatricCalculations';
 import { AllergyAlertBadge } from '../../../../components/common';
@@ -9,6 +9,7 @@ interface PatientClinicalHeaderProps {
   onBack: () => void;
   onStartConsultation?: () => void;
   onOpenVaccines?: () => void;
+  onCreateRecipe?: () => void;
 }
 
 export const PatientClinicalHeader: React.FC<PatientClinicalHeaderProps> = ({
@@ -16,6 +17,7 @@ export const PatientClinicalHeader: React.FC<PatientClinicalHeaderProps> = ({
   onBack,
   onStartConsultation,
   onOpenVaccines,
+  onCreateRecipe,
 }) => {
   const ageLabel = calculateExactAgeLabel(patient.birthDate);
   const fullName = `${patient.firstName} ${patient.lastName}`;
@@ -68,16 +70,25 @@ export const PatientClinicalHeader: React.FC<PatientClinicalHeaderProps> = ({
             <button
               type="button"
               onClick={onOpenVaccines}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer"
             >
               <Syringe className="w-4 h-4 text-emerald-600" /> Carnet Vacunas
+            </button>
+          )}
+          {onCreateRecipe && (
+            <button
+              type="button"
+              onClick={onCreateRecipe}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 cursor-pointer"
+            >
+              <Pill className="w-4 h-4 text-emerald-600" /> Crear Récipe
             </button>
           )}
           {onStartConsultation && (
             <button
               type="button"
               onClick={onStartConsultation}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-sm cursor-pointer"
             >
               <Stethoscope className="w-4 h-4" /> Nueva Consulta
             </button>

@@ -27,7 +27,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
   if (isPublicAuthView) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] relative">
+      <div className="min-h-screen bg-gradient-to-br from-[#E0F2FE] via-[#F0F9FF] to-[#CCFBF1]/70 text-[#0F172A] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] relative">
         {children}
         <ToastBanner message={toastMessage} />
       </div>
@@ -37,7 +37,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
   const hasAccess = canRoleAccessView(userRole, currentView);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex">
+    <div className="min-h-screen bg-gradient-to-br from-[#E0F2FE]/70 via-[#F0F9FF] to-[#CCFBF1]/50 text-[#0F172A] flex">
       <Sidebar mobileOpen={mobileMenuOpen} onCloseMobile={() => setMobileMenuOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -48,7 +48,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
         <AssistantCallBanner />
 
-        <main className="flex-1 p-4 sm:p-6 pb-20 md:pb-6 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-6 overflow-y-auto">
           {hasAccess ? (
             children
           ) : (
