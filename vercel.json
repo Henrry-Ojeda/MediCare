@@ -13,7 +13,8 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/:match*", "destination": "https://queseracampoverde.duckdns.org/medicare-api/:match*" },
     { "source": "/descargar", "destination": "/descargar.html" },
-    { "source": "/((?!assets/|downloads/|descargar\\.html|sw\\.js|manifest\\.webmanifest).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|downloads/|api/|descargar\\.html|sw\\.js|manifest\\.webmanifest).*)", "destination": "/index.html" }
   ]
 }
