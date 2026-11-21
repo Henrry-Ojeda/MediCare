@@ -4,6 +4,7 @@ export interface VitalSigns {
   headCircumferenceCm?: number;
   temperatureC: number;
   heartRateBpm: number;
+  respiratoryRateRpm?: number;
   spo2Percent: number;
   systolicBp: number;
   diastolicBp: number;

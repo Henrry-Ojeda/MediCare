@@ -1,32 +1,24 @@
 const API_SERVER_OVERRIDE_KEY = 'medicare_api_base_url';
 
 function resolveApiBaseUrl(): string {
-  const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
-  if (envUrl) return envUrl;
-
   if (typeof window !== 'undefined') {
+    if (window.location.hostname.endsWith('.vercel.app')) {
+      return '/api';
+    }
+
     try {
       const saved = localStorage.getItem(API_SERVER_OVERRIDE_KEY)?.trim().replace(/\/$/, '');
       if (saved) return saved;
     } catch {
       // ignore storage errors
     }
+  }
 
-    const isCapacitorNative =
-      Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) ||
-      window.location.protocol === 'capacitor:';
+  const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+  if (envUrl) return envUrl;
 
-    if (isCapacitorNative) {
-      return 'http://192.168.1.111:5189/api';
-    }
-
-    if (window.location.hostname.endsWith('.vercel.app')) {
-      return '/api';
-    }
-
-    if (window.location.hostname) {
-      return `http://${window.location.hostname}:5189/api`;
-    }
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:5189/api`;
   }
 
   return 'http://localhost:5189/api';
@@ -56,6 +48,8 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
+export const UNAUTHORIZED_EVENT = 'medicare:unauthorized';
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
@@ -69,13 +63,21 @@ export async function apiFetch<T>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const res = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     ...options,
     headers,
   });
 
   if (!res.ok) {
     const errPayload = await res.json().catch(() => ({}));
+    if (res.status === 401 && !normalizedPath.startsWith('/auth/login')) {
+      setAuthToken(null);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+      }
+      throw new Error(errPayload?.message || 'Sesión expirada o sin autorización. Inicia sesión nuevamente.');
+    }
     throw new Error(errPayload?.message || `Error HTTP ${res.status}`);
   }
 

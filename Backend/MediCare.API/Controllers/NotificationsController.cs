@@ -22,8 +22,19 @@ public sealed class NotificationsController : ControllerBase
         string? Priority,
         List<string> TargetRoles,
         string? PatientId,
-        string? AppointmentId
+        string? AppointmentId,
+        string? TargetUserId = null
     );
+
+    private static async Task EnsureTargetUserColumnAsync(System.Data.Common.DbConnection conn, CancellationToken ct)
+    {
+        await conn.ExecuteAsync(
+            new CommandDefinition(
+                "IF COL_LENGTH('dbo.TB_NOTIFICACIONES', 'TargetUserId') IS NULL ALTER TABLE dbo.TB_NOTIFICACIONES ADD TargetUserId NVARCHAR(100) NULL;",
+                cancellationToken: ct
+            )
+        );
+    }
 
     public sealed record CallAssistantRequest(
         string Reason,
@@ -35,11 +46,12 @@ public sealed class NotificationsController : ControllerBase
     public async Task<IActionResult> List(CancellationToken ct)
     {
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureTargetUserColumnAsync(conn, ct);
 
         var notifications = (await conn.QueryAsync<dynamic>(
             """
             SELECT TOP 40 Id, Title, Message, Category, Priority, TargetRoles,
-                   CreatedAtLabel, IsRead, PatientId, AppointmentId
+                   CreatedAtLabel, IsRead, PatientId, AppointmentId, TargetUserId
             FROM dbo.TB_NOTIFICACIONES
             ORDER BY CreatedAt DESC
             """
@@ -56,6 +68,7 @@ public sealed class NotificationsController : ControllerBase
             read = (bool)n.IsRead,
             patientId = (string?)n.PatientId,
             appointmentId = (string?)n.AppointmentId,
+            targetUserId = (string?)n.TargetUserId,
         }).ToList();
 
         var call = await conn.QueryFirstOrDefaultAsync<dynamic>(
@@ -94,12 +107,13 @@ public sealed class NotificationsController : ControllerBase
         var roles = req.TargetRoles is { Count: > 0 } ? string.Join(",", req.TargetRoles) : "PEDIATRA,ASISTENTE";
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureTargetUserColumnAsync(conn, ct);
         await conn.ExecuteAsync(
             """
             INSERT INTO dbo.TB_NOTIFICACIONES
-                (Id, Title, Message, Category, Priority, TargetRoles, CreatedAtLabel, IsRead, PatientId, AppointmentId)
+                (Id, Title, Message, Category, Priority, TargetRoles, CreatedAtLabel, IsRead, PatientId, AppointmentId, TargetUserId)
             VALUES
-                (@Id, @Title, @Message, @Category, @Priority, @TargetRoles, @CreatedAtLabel, 0, @PatientId, @AppointmentId)
+                (@Id, @Title, @Message, @Category, @Priority, @TargetRoles, @CreatedAtLabel, 0, @PatientId, @AppointmentId, @TargetUserId)
             """,
             new
             {
@@ -112,6 +126,7 @@ public sealed class NotificationsController : ControllerBase
                 CreatedAtLabel = nowLabel,
                 req.PatientId,
                 req.AppointmentId,
+                req.TargetUserId,
             }
         );
 

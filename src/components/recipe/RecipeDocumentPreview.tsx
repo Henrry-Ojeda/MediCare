@@ -20,6 +20,7 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
   activePage,
 }) => {
   const isVerticalSplit = templateConfig.layoutMode !== 'classic';
+  const isHorizontal = templateConfig.orientation === 'horizontal';
   const fontClass =
     templateConfig.fontFamily === 'Serif Clásico'
       ? 'font-serif'
@@ -29,18 +30,35 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
 
   return (
     <div
-      className={`bg-white w-full max-w-2xl rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between ${fontClass}`}
+      className={`bg-white w-full ${isHorizontal ? 'max-w-4xl' : 'max-w-2xl'} rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between ${fontClass}`}
       style={{ borderTop: `5px solid ${templateConfig.borderColor}` }}
     >
       {activePage === 1 ? (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-200 pb-4">
-            <div>
-              <h4 className="text-base font-bold text-slate-900">{templateConfig.clinicName}</h4>
-              <p className="text-xs text-slate-600">{templateConfig.clinicSubtitle}</p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                RIF: {templateConfig.rif} · {templateConfig.address}
-              </p>
+          <div
+            className={`flex flex-wrap items-start gap-3 border-b border-slate-200 pb-4 ${
+              templateConfig.logoPosition === 'center'
+                ? 'flex-col items-center text-center'
+                : templateConfig.logoPosition === 'right'
+                  ? 'flex-row-reverse justify-between'
+                  : 'justify-between'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {templateConfig.logoDataUrl && (
+                <img
+                  src={templateConfig.logoDataUrl}
+                  alt="Logo"
+                  className="h-12 w-auto object-contain rounded-lg"
+                />
+              )}
+              <div>
+                <h4 className="text-base font-bold text-slate-900">{templateConfig.clinicName}</h4>
+                <p className="text-xs text-slate-600">{templateConfig.clinicSubtitle}</p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  RIF: {templateConfig.rif} · {templateConfig.address}
+                </p>
+              </div>
             </div>
             <div className="text-right font-mono text-xs text-slate-500">
               <div>RÉCIPE MÉDICO</div>

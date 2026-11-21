@@ -5,6 +5,7 @@ using Dapper;
 using MediCare.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 namespace MediCare.API.Controllers;
@@ -42,6 +43,7 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest req, CancellationToken ct)
     {
         var identifier = (req.Username ?? req.Email ?? string.Empty).Trim().ToLowerInvariant();

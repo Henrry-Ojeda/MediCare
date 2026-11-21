@@ -209,11 +209,17 @@ export const clinicalSync = {
   async completeConsultation(
     patientId: string,
     consultation: PastConsultationSummary,
-    vitals: VitalSigns
+    vitals: VitalSigns,
+    appointmentId?: string
   ) {
     if (!hasRealAuthSession()) return;
+    const isUuid = Boolean(
+      appointmentId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(appointmentId)
+    );
     await medicareApi.completeConsultation({
       patientId,
+      appointmentId: isUuid ? appointmentId : undefined,
       specialtyId: 1,
       cie10Code: consultation.cie10Code,
       cie10Name: consultation.cie10Name,

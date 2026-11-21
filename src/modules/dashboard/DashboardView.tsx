@@ -14,10 +14,12 @@ import {
   Save,
   ShieldCheck,
   UserPlus,
+  FileText,
 } from 'lucide-react';
 import { KpiCard, Card, StatusBadge } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
+import { getTodayIsoDate } from '../../utils/formatters';
 
 export const DashboardView: React.FC = () => {
   const { currentUser, userRole } = useAuth();
@@ -219,14 +221,18 @@ export const DashboardView: React.FC = () => {
         )
       : appointments;
 
-  const waitingPatients = doctorAppointments.filter(
+  const todayIso = getTodayIsoDate();
+  const todayDoctorAppointments = doctorAppointments.filter((a) => a.date === todayIso);
+
+  const waitingPatients = todayDoctorAppointments.filter(
     (a) => a.stage === 'en_sala' || a.stage === 'en_triaje' || a.stage === 'en_consulta'
   );
-  const completedToday = doctorAppointments.filter((a) => a.stage === 'completado').length;
+  const completedToday = todayDoctorAppointments.filter((a) => a.stage === 'completado').length;
   const pendingVaccinesCount = patients.reduce(
     (acc, p) => acc + p.vaccines.filter((v) => v.status === 'pendiente').length,
     0
   );
+  const isSoloDoctor = userRole === 'PEDIATRA' && !currentDoctorHasAssistant;
 
   return (
     <div className="space-y-6">
@@ -236,7 +242,7 @@ export const DashboardView: React.FC = () => {
             Hola, {currentUser?.name || 'Equipo Médico'}
           </h2>
           <p className="text-xs text-slate-500">
-            Resumen operativo de Pediatría · {doctorAppointments.length} citas registradas hoy
+            Resumen operativo de Pediatría · {todayDoctorAppointments.length} citas programadas para hoy
           </p>
         </div>
 
@@ -275,18 +281,28 @@ export const DashboardView: React.FC = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           title="Citas de Hoy"
-          value={doctorAppointments.length}
+          value={todayDoctorAppointments.length}
           subtitle={`${completedToday} atendidas`}
           icon={<Calendar className="w-4 h-4" />}
           accentClass="bg-sky-50 text-[#0284C7]"
         />
-        <KpiCard
-          title="En Sala / Triaje"
-          value={waitingPatients.length}
-          subtitle="Pacientes activos"
-          icon={<Activity className="w-4 h-4" />}
-          accentClass="bg-amber-50 text-amber-600"
-        />
+        {isSoloDoctor ? (
+          <KpiCard
+            title="Consultas Atendidas"
+            value={completedToday}
+            subtitle="Completadas hoy"
+            icon={<Stethoscope className="w-4 h-4" />}
+            accentClass="bg-violet-50 text-[#7C3AED]"
+          />
+        ) : (
+          <KpiCard
+            title="En Sala / Triaje"
+            value={waitingPatients.length}
+            subtitle="Pacientes activos"
+            icon={<Activity className="w-4 h-4" />}
+            accentClass="bg-amber-50 text-amber-600"
+          />
+        )}
         <KpiCard
           title="Pacientes Registrados"
           value={patients.length}
@@ -304,14 +320,14 @@ export const DashboardView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Cola en vivo de Sala de Espera o Atención Directa sin Asistente */}
-        {userRole === 'PEDIATRA' && !currentDoctorHasAssistant ? (
+        {/* Citas de Hoy (Doctor solo) o Sala de Espera */}
+        {isSoloDoctor ? (
           <Card className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Atención Directa (Sin Asistente)</h3>
+                <h3 className="text-sm font-bold text-slate-900">Citas de Hoy ({todayIso})</h3>
                 <p className="text-xs text-slate-500">
-                  No tiene asistente asignado; la sala de espera digital no está activa.
+                  Pacientes agendados para hoy. Si ya vino antes, búscalo en Pacientes.
                 </p>
               </div>
               <button
@@ -319,30 +335,73 @@ export const DashboardView: React.FC = () => {
                 onClick={() => setCurrentView('agenda')}
                 className="text-xs font-semibold text-[#0284C7] hover:underline cursor-pointer"
               >
-                Ver Agenda →
+                Ver Agenda e Histórico →
               </button>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-5 space-y-3 text-center">
-              <p className="text-xs text-slate-600">
-                Los pacientes pasan en orden de llegada uno a uno. Busque directamente al paciente para abrir su historial o iniciar la consulta.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('pacientes')}
-                  className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
-                >
-                  Buscar en Directorio de Pacientes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('consulta-activa')}
-                  className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold cursor-pointer"
-                >
-                  Ir a Consulta
-                </button>
+
+            {todayDoctorAppointments.length === 0 ? (
+              <div className="py-10 text-center space-y-3">
+                <p className="text-xs text-slate-500">No tienes citas programadas para hoy.</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView('agenda')}
+                    className="px-4 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
+                  >
+                    Ir a Agenda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView('pacientes')}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
+                  >
+                    Buscar en Pacientes
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2.5">
+                {todayDoctorAppointments.map((apt) => (
+                  <div
+                    key={apt.id}
+                    className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#0284C7]">{apt.time}</span>
+                        <StatusBadge
+                          label={apt.stage === 'completado' ? 'Atendida' : 'Programada'}
+                          variant={apt.stage === 'completado' ? 'success' : 'warning'}
+                        />
+                      </div>
+                      <div className="text-sm font-bold text-slate-900 mt-1">{apt.patientName}</div>
+                      <div className="text-xs text-slate-500">
+                        {apt.patientAgeLabel} · Rep: {apt.guardianName}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => navigateToPatient360(apt.patientId)}
+                        className="px-2.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-[#0284C7]" />
+                        <span>Historial</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigateToActiveConsultation(apt.patientId)}
+                        className="px-3 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Stethoscope className="w-3.5 h-3.5" />
+                        <span>Atender</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         ) : (
         <Card className="lg:col-span-7 space-y-4">

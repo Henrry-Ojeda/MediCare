@@ -30,6 +30,7 @@ interface NotificationContextValue {
     targetRoles: UserRole[];
     patientId?: string;
     appointmentId?: string;
+    targetUserId?: string;
   }) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
@@ -127,11 +128,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           read: n.read,
           patientId: n.patientId,
           appointmentId: n.appointmentId,
+          targetUserId: n.targetUserId,
         }));
 
         if (initialSyncDoneRef.current) {
           for (const n of mappedNotifs) {
-            if (!seenNotifIdsRef.current.has(n.id) && !n.read && n.targetRoles.includes(userRole)) {
+            const matchesDoctor =
+              userRole !== 'PEDIATRA' || !n.targetUserId || n.targetUserId === currentUser?.id;
+            if (
+              !seenNotifIdsRef.current.has(n.id) &&
+              !n.read &&
+              n.targetRoles.includes(userRole) &&
+              matchesDoctor
+            ) {
               playClinicalChime(n.priority === 'urgent' ? 'assistant_urgent' : 'notification');
               triggerBrowserNotification(n.title, n.message);
             }
@@ -218,7 +227,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const pushNotification: NotificationContextValue['pushNotification'] = useCallback(
-    ({ title, message, category, priority = 'normal', targetRoles, patientId, appointmentId }) => {
+    ({ title, message, category, priority = 'normal', targetRoles, patientId, appointmentId, targetUserId }) => {
       const created: AppNotification = {
         id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         title,
@@ -230,6 +239,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         read: false,
         patientId,
         appointmentId,
+        targetUserId,
       };
       seenNotifIdsRef.current.add(created.id);
       setAllNotifications((prev) => [created, ...prev.slice(0, 49)]);
@@ -244,14 +254,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             targetRoles,
             patientId,
             appointmentId,
+            targetUserId,
           })
           .catch(() => {});
       }
-      if (targetRoles.includes(userRole)) {
+      const matchesDoctor =
+        userRole !== 'PEDIATRA' || !targetUserId || targetUserId === currentUser?.id;
+      if (targetRoles.includes(userRole) && matchesDoctor) {
         playClinicalChime(priority === 'urgent' ? 'assistant_urgent' : 'notification');
       }
     },
-    [userRole]
+    [userRole, currentUser?.id]
   );
 
   const markAsRead = (id: string) => {
@@ -334,7 +347,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const notifications = allNotifications.filter((n) => n.targetRoles.includes(userRole));
+  const notifications = allNotifications.filter(
+    (n) =>
+      n.targetRoles.includes(userRole) &&
+      (userRole !== 'PEDIATRA' || !n.targetUserId || n.targetUserId === currentUser?.id)
+  );
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (

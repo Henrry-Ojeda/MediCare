@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Calculator, Pill, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Calculator, Eye, Pill, Plus, Trash2 } from 'lucide-react';
 import { PrescriptionItem } from '../../../../types/medical';
 import { PEDIATRIC_DRUG_FORMULAS } from '../config/pediatricFormulary';
 import { calculatePediatricDose, findAllergyConflict } from '../../../../utils/pediatricCalculations';
@@ -9,6 +9,8 @@ interface PediatricPrescriptionCardProps {
   criticalAllergies: string[];
   prescriptions: PrescriptionItem[];
   onChange: (items: PrescriptionItem[]) => void;
+  isPreviewOpen?: boolean;
+  onTogglePreview?: () => void;
 }
 
 export const PediatricPrescriptionCard: React.FC<PediatricPrescriptionCardProps> = ({
@@ -16,6 +18,8 @@ export const PediatricPrescriptionCard: React.FC<PediatricPrescriptionCardProps>
   criticalAllergies,
   prescriptions,
   onChange,
+  isPreviewOpen,
+  onTogglePreview,
 }) => {
   const [selectedDrugName, setSelectedDrugName] = useState(PEDIATRIC_DRUG_FORMULAS[0]?.name || '');
 
@@ -69,13 +73,29 @@ export const PediatricPrescriptionCard: React.FC<PediatricPrescriptionCardProps>
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <Pill className="w-4 h-4 text-sky-600" /> Récipe Médico y Dosificación Pediátrica ({weightKg} kg)
         </h3>
-        <button
-          type="button"
-          onClick={handleAddManualDrug}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
-        >
-          <Plus className="w-3.5 h-3.5" /> Línea Manual
-        </button>
+        <div className="flex items-center gap-2">
+          {onTogglePreview && (
+            <button
+              type="button"
+              onClick={onTogglePreview}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer ${
+                isPreviewOpen
+                  ? 'bg-sky-600 border-sky-600 text-white'
+                  : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>{isPreviewOpen ? 'Ocultar Vista Previa' : 'Vista Previa Récipe'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleAddManualDrug}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" /> Línea Manual
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 space-y-2.5">

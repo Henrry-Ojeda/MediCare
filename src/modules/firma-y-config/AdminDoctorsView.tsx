@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Building2,
   Calendar,
   Camera,
   Eye,
@@ -22,10 +23,12 @@ export const AdminDoctorsView: React.FC = () => {
   const {
     doctors,
     assistants,
+    clinics,
     addDoctorProfile,
     updateDoctorProfile,
     removeDoctorProfile,
     saveAssistantAssignment,
+    saveClinic,
   } = useClinical();
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,6 +43,7 @@ export const AdminDoctorsView: React.FC = () => {
   const [licenseNumber, setLicenseNumber] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [selectedAssistantIds, setSelectedAssistantIds] = useState<string[]>([]);
+  const [selectedClinicIds, setSelectedClinicIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
   const resetForm = () => {
@@ -54,6 +58,7 @@ export const AdminDoctorsView: React.FC = () => {
     setLicenseNumber('');
     setAvatarUrl('');
     setSelectedAssistantIds([]);
+    setSelectedClinicIds([]);
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +72,66 @@ export const AdminDoctorsView: React.FC = () => {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const syncClinicsForDoctor = async (
+    doctorId: string,
+    doctorName: string,
+    clinicIds: string[],
+    assistantIds: string[]
+  ) => {
+    for (const clinic of clinics) {
+      const currentAssignments = clinic.assignments || [];
+      const hasDoctor = currentAssignments.some((a) => a.doctorId === doctorId);
+      const shouldHaveDoctor = clinicIds.includes(clinic.id);
+      if (!hasDoctor && !shouldHaveDoctor) continue;
+
+      const withoutDoctor = currentAssignments.filter((a) => a.doctorId !== doctorId);
+      let nextAssignments = withoutDoctor;
+
+      if (shouldHaveDoctor) {
+        const existingDoctorRows = currentAssignments.filter((a) => a.doctorId === doctorId);
+        if (existingDoctorRows.length > 0) {
+          nextAssignments = [...withoutDoctor, ...existingDoctorRows];
+        } else if (assistantIds.length > 0) {
+          const added = assistantIds.map((asstId) => {
+            const asst = assistants.find((a) => a.id === asstId);
+            return {
+              id: `tmp-${doctorId}-${asstId}`,
+              doctorId,
+              doctorName,
+              assistantId: asstId,
+              assistantName: asst?.assistantName || null,
+            };
+          });
+          nextAssignments = [...withoutDoctor, ...added];
+        } else {
+          nextAssignments = [
+            ...withoutDoctor,
+            {
+              id: `tmp-${doctorId}-none`,
+              doctorId,
+              doctorName,
+              assistantId: null,
+              assistantName: null,
+            },
+          ];
+        }
+      }
+
+      if (hasDoctor !== shouldHaveDoctor) {
+        await saveClinic({
+          id: clinic.id,
+          name: clinic.name,
+          rif: clinic.rif,
+          phone: clinic.phone,
+          email: clinic.email,
+          address: clinic.address,
+          active: clinic.active,
+          assignments: nextAssignments,
+        });
+      }
+    }
   };
 
   const syncAssistantsForDoctor = (doctorId: string, assistantIds: string[]) => {
@@ -111,6 +176,7 @@ export const AdminDoctorsView: React.FC = () => {
       const ok = await updateDoctorProfile(updated);
       if (!ok) return;
       syncAssistantsForDoctor(editingId, selectedAssistantIds);
+      await syncClinicsForDoctor(editingId, fullName, selectedClinicIds, selectedAssistantIds);
     } else {
       const created = await addDoctorProfile({
         name: fullName,
@@ -127,6 +193,7 @@ export const AdminDoctorsView: React.FC = () => {
       });
       if (!created) return;
       syncAssistantsForDoctor(created.id, selectedAssistantIds);
+      await syncClinicsForDoctor(created.id, fullName, selectedClinicIds, selectedAssistantIds);
     }
 
     resetForm();
@@ -146,6 +213,17 @@ export const AdminDoctorsView: React.FC = () => {
     setAvatarUrl(doc.avatarUrl || '');
     setSelectedAssistantIds(
       assistants.filter((a) => a.assignedDoctorIds.includes(doc.id)).map((a) => a.id)
+    );
+    setSelectedClinicIds(
+      clinics
+        .filter((c) => (c.assignments || []).some((a) => a.doctorId === doc.id))
+        .map((c) => c.id)
+    );
+  };
+
+  const toggleClinicSelection = (clinicId: string) => {
+    setSelectedClinicIds((prev) =>
+      prev.includes(clinicId) ? prev.filter((id) => id !== clinicId) : [...prev, clinicId]
     );
   };
 
@@ -340,6 +418,38 @@ export const AdminDoctorsView: React.FC = () => {
           </div>
         </div>
 
+        <div className="pt-2 border-t border-slate-100 space-y-2">
+          <p className="text-[11px] font-bold text-slate-600">
+            Clínicas donde atiende (puede seleccionar varias clínicas registradas en el sistema):
+          </p>
+          {clinics.length === 0 ? (
+            <p className="text-[11px] text-slate-400">
+              No hay clínicas registradas en el sistema todavía. Créalas primero en la sección Clínicas.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {clinics.map((clinic) => {
+                const active = selectedClinicIds.includes(clinic.id);
+                return (
+                  <button
+                    key={clinic.id}
+                    type="button"
+                    onClick={() => toggleClinicSelection(clinic.id)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer ${
+                      active
+                        ? 'bg-sky-50 border-[#0284C7] text-[#0284C7]'
+                        : 'bg-white border-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    {clinic.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {assistants.length > 0 && (
           <div className="pt-2 border-t border-slate-100 space-y-2">
             <p className="text-[11px] font-bold text-slate-600">
@@ -405,6 +515,9 @@ export const AdminDoctorsView: React.FC = () => {
         ) : (
           filteredDoctors.map((doc) => {
             const docAssistants = assistants.filter((a) => a.assignedDoctorIds.includes(doc.id));
+            const docClinics = clinics.filter((c) =>
+              (c.assignments || []).some((a) => a.doctorId === doc.id)
+            );
             return (
               <div
                 key={doc.id}
@@ -437,8 +550,21 @@ export const AdminDoctorsView: React.FC = () => {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1 pt-1">
+                    {docClinics.length === 0 ? (
+                      <span className="text-[10px] text-slate-400">Sin clínicas asignadas</span>
+                    ) : (
+                      docClinics.map((c) => (
+                        <span
+                          key={c.id}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px] font-semibold"
+                        >
+                          <Building2 className="w-2.5 h-2.5" />
+                          {c.name}
+                        </span>
+                      ))
+                    )}
                     {docAssistants.length === 0 ? (
-                      <span className="text-[10px] text-slate-400">Sin asistentes asignados</span>
+                      <span className="text-[10px] text-slate-400">· Sin asistentes</span>
                     ) : (
                       docAssistants.map((a) => (
                         <span

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Columns2, Palette, Save } from 'lucide-react';
+import { Columns2, ImagePlus, Palette, Save, Trash2 } from 'lucide-react';
 import { useClinical } from '../../context/ClinicalContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
@@ -11,11 +11,25 @@ export const RecipeTemplateDesignerView: React.FC = () => {
   const { showToast } = useNotifications();
   const [form, setForm] = useState<RecipeTemplateConfig>({
     ...templateConfig,
+    orientation: templateConfig.orientation || 'vertical',
     layoutMode: templateConfig.layoutMode || 'vertical_split',
     leftColumnTitle: templateConfig.leftColumnTitle || 'RP / MEDICAMENTOS Y EXÁMENES',
     rightColumnTitle: templateConfig.rightColumnTitle || 'INDICACIONES E INSTRUCCIONES',
     showDiagnosisOnRecipe: templateConfig.showDiagnosisOnRecipe !== false,
   });
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setForm((prev) => ({ ...prev, logoDataUrl: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +110,24 @@ export const RecipeTemplateDesignerView: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Formato de Hoja</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Orientación de Hoja</label>
+            <select
+              value={form.orientation || 'vertical'}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  orientation: e.target.value as RecipeTemplateConfig['orientation'],
+                })
+              }
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs bg-white font-semibold"
+            >
+              <option value="vertical">Vertical (Carta)</option>
+              <option value="horizontal">Horizontal (Media Carta / Paisaje)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Formato de Contenido</label>
             <select
               value={form.layoutMode || 'vertical_split'}
               onChange={(e) =>
@@ -107,9 +138,55 @@ export const RecipeTemplateDesignerView: React.FC = () => {
               }
               className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs bg-white font-semibold"
             >
-              <option value="vertical_split">Hoja Vertical Dividida (Izq: Medicina · Der: Instrucciones)</option>
-              <option value="classic">Formato Clásico (Lista única)</option>
+              <option value="vertical_split">Dividido (Izq: Medicina · Der: Instrucciones)</option>
+              <option value="classic">Clásico (Lista única)</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Posición del Logotipo</label>
+            <select
+              value={form.logoPosition}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  logoPosition: e.target.value as RecipeTemplateConfig['logoPosition'],
+                })
+              }
+              className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs bg-white font-semibold"
+            >
+              <option value="left">Izquierda</option>
+              <option value="center">Centro</option>
+              <option value="right">Derecha</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-3 flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer">
+              <ImagePlus className="w-4 h-4 text-[#0284C7]" />
+              <span>{form.logoDataUrl ? 'Cambiar Logotipo' : 'Subir Logotipo (PNG/JPG)'}</span>
+              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </label>
+            {form.logoDataUrl ? (
+              <div className="flex items-center gap-2">
+                <img
+                  src={form.logoDataUrl}
+                  alt="Logotipo del récipe"
+                  className="h-10 w-auto rounded-lg border border-slate-200 bg-white p-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, logoDataUrl: undefined })}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Quitar
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-500">
+                Opcional: sube el logo de tu consultorio o clínica para el membrete.
+              </span>
+            )}
           </div>
 
           <div>
@@ -217,7 +294,9 @@ export const RecipeTemplateDesignerView: React.FC = () => {
           Vista Previa del Récipe Médico
         </p>
         <div
-          className={`bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4 max-w-2xl mx-auto ${
+          className={`bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4 mx-auto ${
+            form.orientation === 'horizontal' ? 'max-w-4xl' : 'max-w-2xl'
+          } ${
             form.fontFamily === 'Serif Clásico'
               ? 'font-serif'
               : form.fontFamily === 'Monospace Clínico'
@@ -226,13 +305,30 @@ export const RecipeTemplateDesignerView: React.FC = () => {
           }`}
           style={{ borderTop: `5px solid ${form.borderColor}` }}
         >
-          <div className="flex items-start justify-between border-b border-slate-200 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">{form.clinicName}</h3>
-              <p className="text-xs text-slate-600">{form.clinicSubtitle}</p>
-              <p className="text-[11px] text-slate-400">
-                RIF: {form.rif} · {form.address}
-              </p>
+          <div
+            className={`flex items-start gap-3 border-b border-slate-200 pb-3 ${
+              form.logoPosition === 'center'
+                ? 'flex-col items-center text-center'
+                : form.logoPosition === 'right'
+                  ? 'flex-row-reverse justify-between'
+                  : 'justify-between'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {form.logoDataUrl && (
+                <img
+                  src={form.logoDataUrl}
+                  alt="Logo"
+                  className="h-12 w-auto object-contain rounded-lg"
+                />
+              )}
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{form.clinicName}</h3>
+                <p className="text-xs text-slate-600">{form.clinicSubtitle}</p>
+                <p className="text-[11px] text-slate-400">
+                  RIF: {form.rif} · {form.address}
+                </p>
+              </div>
             </div>
             <div className="text-right text-xs font-mono text-slate-500">
               <div>RÉCIPE MÉDICO</div>

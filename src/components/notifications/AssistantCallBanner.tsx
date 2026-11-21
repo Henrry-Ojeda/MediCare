@@ -60,7 +60,52 @@ export const AssistantCallBanner: React.FC = () => {
   if (!isAssistant) return null;
 
   return (
-    <div className="mx-4 sm:mx-6 mt-3 p-4 rounded-2xl bg-rose-600 text-white shadow-lg flex flex-wrap items-center justify-between gap-3 no-print">
+    <>
+      {isPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 no-print">
+          <div className="w-full max-w-md rounded-2xl bg-white border-2 border-rose-500 shadow-2xl overflow-hidden">
+            <div className="bg-rose-600 text-white px-5 py-4 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <BellRing className="w-6 h-6 animate-bounce" />
+              </div>
+              <div>
+                <div className="text-[11px] font-mono uppercase tracking-wider text-rose-100">
+                  Llamado Automático · {activeAssistantCall.consultorioLabel}
+                </div>
+                <h3 className="text-base font-bold">
+                  {activeAssistantCall.requestedByDoctor} solicita atención
+                </h3>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {activeAssistantCall.patientName && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3">
+                  <div className="text-[11px] font-bold uppercase text-rose-700">Paciente</div>
+                  <div className="text-base font-extrabold text-slate-900">
+                    {activeAssistantCall.patientName}
+                  </div>
+                </div>
+              )}
+              <p className="text-sm text-slate-700 font-medium">
+                {activeAssistantCall.reason} ({activeAssistantCall.createdAt})
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={acknowledgeAssistantCall}
+                  className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-sm cursor-pointer"
+                >
+                  Confirmar: Paciente pasando / En camino
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mx-4 sm:mx-6 mt-3 p-4 rounded-2xl bg-rose-600 text-white shadow-lg flex flex-wrap items-center justify-between gap-3 no-print">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
           <BellRing className="w-5 h-5 animate-bounce" />
@@ -100,5 +145,6 @@ export const AssistantCallBanner: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
