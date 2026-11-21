@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { DictationAiResult } from '../types/consultation.types';
 import { medicareApi } from '../api/medicareApi';
+import { loadDoctorAiConfig } from '../utils/aiPrefs';
 
 interface SpeechRecognitionEventLike {
   resultIndex: number;
@@ -292,15 +293,20 @@ export function useClinicalDictation() {
       patientName: string;
       patientAge: string;
       weightKg: number;
+      userId?: string;
     }): Promise<{ source: string; data: DictationAiResult | null }> => {
       setStatus('processing');
       try {
+        const aiCfg = loadDoctorAiConfig(context.userId);
         const res = await medicareApi.processConsultationAi({
           transcript,
           patientName: context.patientName,
           patientAge: context.patientAge,
           weightKg: context.weightKg,
           specialty: 'Pediatría',
+          ...(aiCfg.enabled && aiCfg.enableDictationAi && aiCfg.apiKey.trim()
+            ? { apiKey: aiCfg.apiKey.trim(), model: aiCfg.model }
+            : {}),
         });
         setStatus('completed');
         return { source: res.source, data: res.data as DictationAiResult | null };

@@ -30,11 +30,33 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
 
   return (
     <div
-      className={`bg-white w-full ${isHorizontal ? 'max-w-4xl' : 'max-w-2xl'} rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between ${fontClass}`}
-      style={{ borderTop: `5px solid ${templateConfig.borderColor}` }}
+      className={`relative overflow-hidden bg-white w-full ${isHorizontal ? 'max-w-4xl' : 'max-w-2xl'} rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8 flex flex-col justify-between ${fontClass}`}
+      style={{
+        borderTop: templateConfig.backgroundTemplateDataUrl
+          ? undefined
+          : `5px solid ${templateConfig.borderColor}`,
+        paddingTop:
+          templateConfig.backgroundTemplateDataUrl && templateConfig.contentTopPaddingPx != null
+            ? `${templateConfig.contentTopPaddingPx}px`
+            : undefined,
+        paddingBottom:
+          templateConfig.backgroundTemplateDataUrl && templateConfig.contentBottomPaddingPx != null
+            ? `${templateConfig.contentBottomPaddingPx}px`
+            : undefined,
+      }}
     >
+      {templateConfig.backgroundTemplateDataUrl && (
+        <img
+          src={templateConfig.backgroundTemplateDataUrl}
+          alt="Formato de récipe del médico"
+          className="absolute inset-0 w-full h-full object-fill pointer-events-none select-none"
+          style={{ opacity: templateConfig.backgroundOpacity ?? 1 }}
+        />
+      )}
+      <div className="relative z-10 flex flex-col justify-between flex-1">
       {activePage === 1 ? (
         <div className="space-y-6">
+          {!(templateConfig.backgroundTemplateDataUrl && templateConfig.hideDefaultHeaderOnBg) && (
           <div
             className={`flex flex-wrap items-start gap-3 border-b border-slate-200 pb-4 ${
               templateConfig.logoPosition === 'center'
@@ -65,6 +87,7 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
               <div className="font-bold text-slate-900">{consultation.date}</div>
             </div>
           </div>
+          )}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 text-xs">
             <div>
@@ -270,6 +293,7 @@ export const RecipeDocumentPreview: React.FC<RecipeDocumentPreviewProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

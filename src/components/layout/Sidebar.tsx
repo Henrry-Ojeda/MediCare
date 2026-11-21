@@ -57,6 +57,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: 'vacunas-catalogo', label: 'Catálogo Vacunas', icon: Syringe },
       { id: 'configuracion', label: 'Agenda y Clínica', icon: Settings },
       { id: 'plantillas', label: 'Personalizar Récipe', icon: FileText },
+      { id: 'ia-modulo', label: 'Módulo IA (Gemini)', icon: Sparkles },
       { id: 'firma-medico', label: 'Firma del Médico', icon: FileSignature },
       { id: 'admin-doctores', label: 'Doctores', icon: Users },
       { id: 'admin-asistentes', label: 'Asistentes', icon: Users },
