@@ -31,7 +31,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
   const [idDocument, setIdDocument] = useState(initialPatient?.idDocument ?? '');
 
   const [guardianName, setGuardianName] = useState(initialPatient?.guardianName ?? '');
-  const [guardianRelation, setGuardianRelation] = useState<'Madre' | 'Padre' | 'Representante Legal'>(
+  const [guardianRelation, setGuardianRelation] = useState<Patient['guardianRelation']>(
     initialPatient?.guardianRelation ?? 'Madre'
   );
   const [guardianIdDocument, setGuardianIdDocument] = useState(initialPatient?.guardianIdDocument ?? '');
