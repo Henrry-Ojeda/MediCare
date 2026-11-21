@@ -102,6 +102,7 @@ const FEATURE_GATED_VIEWS: Partial<Record<ViewId, boolean>> = {
   epidemiologia: FEATURE_FLAGS.enableAdvancedReports,
   auditoria: FEATURE_FLAGS.enableAuditLog,
   onboarding: FEATURE_FLAGS.enableOnboarding,
+  'ia-modulo': FEATURE_FLAGS.enableAiModule,
   plantillas: true,
 };
 
