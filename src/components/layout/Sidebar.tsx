@@ -52,15 +52,15 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
-    label: 'Gestión y Firma',
+    label: 'Configuraciones',
     items: [
       { id: 'vacunas-catalogo', label: 'Catálogo Vacunas', icon: Syringe },
-      { id: 'firma-medico', label: 'Firma del Médico', icon: FileSignature },
+      { id: 'configuracion', label: 'Agenda y Clínica', icon: Settings },
       { id: 'plantillas', label: 'Personalizar Récipe', icon: FileText },
+      { id: 'firma-medico', label: 'Firma del Médico', icon: FileSignature },
       { id: 'admin-doctores', label: 'Doctores', icon: Users },
       { id: 'admin-asistentes', label: 'Asistentes', icon: Users },
       { id: 'admin-clinicas', label: 'Clínicas', icon: Building2 },
-      { id: 'configuracion', label: 'Clínica y Roles', icon: Settings },
       { id: 'perfil', label: 'Mi Perfil', icon: ShieldCheck },
     ],
   },

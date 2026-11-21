@@ -125,8 +125,7 @@ export const AgendaView: React.FC = () => {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const calendarPrefsKey = `medicare_agenda_prefs_${currentUser?.id || 'default'}`;
-  const [showCalendarConfig, setShowCalendarConfig] = useState(false);
-  const [slotInterval, setSlotInterval] = useState<CalendarSlotInterval>(() => {
+  const [slotInterval] = useState<CalendarSlotInterval>(() => {
     try {
       const raw = localStorage.getItem(calendarPrefsKey);
       if (raw) {
@@ -140,7 +139,7 @@ export const AgendaView: React.FC = () => {
     }
     return 30;
   });
-  const [workingDays, setWorkingDays] = useState<number[]>(() => {
+  const [workingDays] = useState<number[]>(() => {
     try {
       const raw = localStorage.getItem(calendarPrefsKey);
       if (raw) {
@@ -154,26 +153,6 @@ export const AgendaView: React.FC = () => {
     }
     return [1, 2, 3, 4, 5, 6];
   });
-
-  const saveCalendarPrefs = (nextInterval: CalendarSlotInterval, nextDays: number[]) => {
-    setSlotInterval(nextInterval);
-    setWorkingDays(nextDays);
-    try {
-      localStorage.setItem(
-        calendarPrefsKey,
-        JSON.stringify({ slotInterval: nextInterval, workingDays: nextDays })
-      );
-    } catch {
-      // ignore
-    }
-  };
-
-  const toggleWorkingDay = (day: number) => {
-    const exists = workingDays.includes(day);
-    if (exists && workingDays.length === 1) return;
-    const nextDays = exists ? workingDays.filter((d) => d !== day) : [...workingDays, day];
-    saveCalendarPrefs(slotInterval, nextDays);
-  };
 
   const timeSlots = useMemo(() => generateTimeSlots(slotInterval), [slotInterval]);
 
@@ -373,19 +352,6 @@ export const AgendaView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowCalendarConfig((v) => !v)}
-            className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer ${
-              showCalendarConfig
-                ? 'bg-sky-50 border-sky-300 text-sky-900'
-                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-            }`}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[#0284C7]" />
-            <span>Configurar</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => {
               setModalPrefillDate(calendarDate < todayIso ? todayIso : calendarDate);
               setSlotPrefillTime(undefined);
@@ -398,55 +364,6 @@ export const AgendaView: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {showCalendarConfig && (
-        <div className="bg-white rounded-2xl border border-sky-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-bold text-slate-500 uppercase">
-              Duración por bloque
-            </span>
-            <div className="inline-flex rounded-xl bg-slate-100 p-1 gap-1">
-              {([15, 30, 45, 60] as CalendarSlotInterval[]).map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => saveCalendarPrefs(mins, workingDays)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
-                    slotInterval === mins ? 'bg-[#0284C7] text-white' : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {mins === 60 ? '1 hora' : `${mins} min`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-bold text-slate-500 uppercase">
-              Días que trabaja el doctor
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {WORKING_DAY_OPTIONS.map((opt) => {
-                const active = workingDays.includes(opt.day);
-                return (
-                  <button
-                    key={opt.day}
-                    type="button"
-                    onClick={() => toggleWorkingDay(opt.day)}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
-                      active
-                        ? 'bg-sky-50 border-sky-300 text-sky-900'
-                        : 'bg-slate-50 border-slate-200 text-slate-400'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Vista Calendario con Drag & Drop (Día o Semana) o Lista */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
