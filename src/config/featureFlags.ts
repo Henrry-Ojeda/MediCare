@@ -11,6 +11,7 @@ export const FEATURE_FLAGS = {
   enablePediatricVaccines: true,
   enablePediatricConsultation: true,
   enableClinicalDictation: true,
+  enableAiModule: true,
   enableDoctorSignature: true,
   enableWhatsappDispatch: true,
   enableAssistantCall: true,

@@ -6,6 +6,7 @@ import { DEMO_DICTATION_SCRIPTS } from '../../../../data/mockClinicalData';
 import { useNotifications } from '../../../../context/NotificationContext';
 import { useAuth } from '../../../../context/AuthContext';
 import { useClinical } from '../../../../context/ClinicalContext';
+import { FEATURE_FLAGS } from '../../../../config/featureFlags';
 
 interface ClinicalDictationBarProps {
   patientName: string;
@@ -127,17 +128,19 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
             </>
           )}
 
-          <button
-            type="button"
-            disabled={status === 'processing' || !transcript.trim()}
-            onClick={handleProcess}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-xs font-bold transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            {status === 'processing' ? 'Estructurando...' : 'Estructurar con IA'}
-          </button>
+          {FEATURE_FLAGS.enableAiModule && (
+            <button
+              type="button"
+              disabled={status === 'processing' || !transcript.trim()}
+              onClick={handleProcess}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-xs font-bold transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              {status === 'processing' ? 'Estructurando...' : 'Estructurar con IA'}
+            </button>
+          )}
 
-          {currentDoctorHasAssistant && (
+          {FEATURE_FLAGS.enableAssistantCall && currentDoctorHasAssistant && (
             <button
               type="button"
               onClick={handleCallAssistant}
