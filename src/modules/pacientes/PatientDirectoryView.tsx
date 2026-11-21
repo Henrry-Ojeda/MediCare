@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { UserPlus, Phone, Syringe, FileText, Stethoscope, Pill } from 'lucide-react';
-import { DataTable, AllergyAlertBadge } from '../../components/common';
+import { UserPlus, Phone, Syringe, FileText, Stethoscope, Pill, Pencil } from 'lucide-react';
+import { DataTable, AllergyAlertBadge, Modal } from '../../components/common';
 import { CreateRecipeModal } from '../../components/recipe/CreateRecipeModal';
+import { PatientForm } from './components/PatientForm';
 import { useClinical } from '../../context/ClinicalContext';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_PERMISSIONS } from '../../config/permissions.config';
@@ -20,6 +21,7 @@ export const PatientDirectoryView: React.FC = () => {
     completeConsultation,
   } = useClinical();
   const [recipePatient, setRecipePatient] = useState<Patient | null>(null);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
   return (
     <div className="space-y-4">
@@ -134,6 +136,14 @@ export const PatientDirectoryView: React.FC = () => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setEditingPatient(patient)}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Editar</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => navigateToActiveConsultation(patient.id)}
                       className="px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
                     >
@@ -173,6 +183,22 @@ export const PatientDirectoryView: React.FC = () => {
             setRecipePatient(null);
           }}
         />
+      )}
+      {editingPatient && (
+        <Modal
+          isOpen={Boolean(editingPatient)}
+          onClose={() => setEditingPatient(null)}
+          title={`Editar Paciente · ${editingPatient.historyNumber}`}
+          subtitle={`${editingPatient.firstName} ${editingPatient.lastName}`}
+          maxWidthClass="max-w-3xl"
+        >
+          <PatientForm
+            initialPatient={editingPatient}
+            compact
+            onCancel={() => setEditingPatient(null)}
+            onUpdated={() => setEditingPatient(null)}
+          />
+        </Modal>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { DictationAiResult } from '../../../../types/consultation.types';
 import { DEMO_DICTATION_SCRIPTS } from '../../../../data/mockClinicalData';
 import { useNotifications } from '../../../../context/NotificationContext';
 import { useAuth } from '../../../../context/AuthContext';
+import { useClinical } from '../../../../context/ClinicalContext';
 
 interface ClinicalDictationBarProps {
   patientName: string;
@@ -39,6 +40,8 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
   const { callAssistantFromConsultorio, showToast } = useNotifications();
   const { currentUser } = useAuth();
   const [showTranscriptBox, setShowTranscriptBox] = useState(true);
+
+  const { currentDoctorHasAssistant } = useClinical();
 
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -133,14 +136,16 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
             {status === 'processing' ? 'Estructurando...' : 'Estructurar con IA'}
           </button>
 
-          <button
-            type="button"
-            onClick={handleCallAssistant}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-xs font-bold transition-colors"
-            title="Enviar alerta sonora al asistente"
-          >
-            <BellRing className="w-4 h-4" /> Llamar Asistente
-          </button>
+          {currentDoctorHasAssistant && (
+            <button
+              type="button"
+              onClick={handleCallAssistant}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-xs font-bold transition-colors"
+              title="Enviar alerta sonora al asistente"
+            >
+              <BellRing className="w-4 h-4" /> Llamar Asistente
+            </button>
+          )}
         </div>
       </div>
 
