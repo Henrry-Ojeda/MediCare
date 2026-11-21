@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { Menu, BellRing, Stethoscope, Calendar, ChevronDown, QrCode, RefreshCw, WifiOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { MobileAppQrModal } from '../common';
-import { APP_VERSION, APK_VERSION_NAME, checkNativeApkUpdate, forceAppUpdate } from '../../utils/appVersion';
+import { APP_VERSION, forceAppUpdate } from '../../utils/appVersion';
 import { ViewId } from '../../types/medical';
 
 interface TopBarProps {
@@ -72,16 +71,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu, onOpenNotifica
     setUpdatingApp(true);
     try {
       await Promise.all([forceAppUpdate(), refreshClinicalData()]);
-      if (Capacitor.isNativePlatform()) {
-        const apkUpdate = await checkNativeApkUpdate();
-        if (apkUpdate.hasUpdate && apkUpdate.downloadUrl) {
-          showToast(`Nueva versión v${apkUpdate.latestVersionName} disponible. Abriendo instalador...`);
-          window.open(apkUpdate.downloadUrl, '_system');
-          return;
-        }
-        showToast(`App y datos al día (v${APK_VERSION_NAME})`);
-        return;
-      }
       showToast(`Sistema y caché actualizados en segundo plano (v${APP_VERSION})`);
     } finally {
       setUpdatingApp(false);

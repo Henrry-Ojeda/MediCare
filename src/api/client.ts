@@ -17,18 +17,8 @@ function resolveApiBaseUrl(): string {
   const envUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
   if (envUrl) return envUrl;
 
-  if (typeof window !== 'undefined') {
-    const isCapacitorNative =
-      Boolean((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) ||
-      window.location.protocol === 'capacitor:';
-
-    if (isCapacitorNative) {
-      return 'http://192.168.1.111:5189/api';
-    }
-
-    if (window.location.hostname) {
-      return `http://${window.location.hostname}:5189/api`;
-    }
+  if (typeof window !== 'undefined' && window.location.hostname) {
+    return `http://${window.location.hostname}:5189/api`;
   }
 
   return 'http://localhost:5189/api';

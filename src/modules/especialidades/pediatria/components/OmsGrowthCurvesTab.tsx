@@ -17,6 +17,9 @@ export const OmsGrowthCurvesTab: React.FC<OmsGrowthCurvesTabProps> = ({ growthHi
 
   const maxWeight = Math.max(...growthHistory.map((g) => g.weightKg), 20);
   const maxHeight = Math.max(...growthHistory.map((g) => g.heightCm), 110);
+  const headValues = growthHistory.map((g) => g.headCircumferenceCm || 0);
+  const hasHeadValues = headValues.some((v) => v > 0);
+  const maxHead = Math.max(...headValues, 55);
 
   const buildPolylinePoints = (values: number[], maxVal: number, width: number, height: number) => {
     if (values.length === 1) {
@@ -86,6 +89,29 @@ export const OmsGrowthCurvesTab: React.FC<OmsGrowthCurvesTabProps> = ({ growthHi
             />
           </svg>
         </div>
+
+        {hasHeadValues && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-violet-600" /> Curva de Perímetro Cefálico (cm)
+              </h3>
+              <span className="text-xs font-semibold text-violet-700 bg-violet-50 px-2.5 py-0.5 rounded-full">
+                Último: {growthHistory[growthHistory.length - 1].headCircumferenceCm ?? 'N/A'} cm
+              </span>
+            </div>
+            <svg viewBox="0 0 360 120" className="w-full h-36 bg-slate-50 rounded-xl border border-slate-100">
+              <polyline
+                fill="none"
+                stroke="#7C3AED"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={buildPolylinePoints(headValues, maxHead, 360, 120)}
+              />
+            </svg>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">

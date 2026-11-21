@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { ShieldCheck, Eye, EyeOff, Lock, Mail, ArrowRight, AlertCircle, RefreshCw, QrCode, Stethoscope } from 'lucide-react';
 import { MobileAppQrModal } from '../../components/common';
 import { useAuth } from '../../context/AuthContext';
@@ -186,18 +185,16 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
-          {!Capacitor.isNativePlatform() && (
-            <div className="pt-3 border-t border-slate-100 flex justify-center">
-              <button
-                type="button"
-                onClick={() => setShowQrModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-xs font-bold text-sky-800 cursor-pointer"
-              >
-                <QrCode className="w-4 h-4 text-sky-600" />
-                <span>Abrir / Instalar App en el Teléfono (QR)</span>
-              </button>
-            </div>
-          )}
+          <div className="pt-3 border-t border-slate-100 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowQrModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100 text-xs font-bold text-sky-800 cursor-pointer"
+            >
+              <QrCode className="w-4 h-4 text-sky-600" />
+              <span>Abrir / Instalar App en el Teléfono (QR)</span>
+            </button>
+          </div>
           </div>
         </div>
       </div>

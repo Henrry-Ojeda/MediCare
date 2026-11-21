@@ -20,13 +20,15 @@ interface MobileTabItem {
 
 export const MobileBottomNav: React.FC = () => {
   const { userRole } = useAuth();
-  const { currentView, setCurrentView } = useClinical();
+  const { currentView, setCurrentView, currentDoctorHasAssistant } = useClinical();
 
   const tabs: MobileTabItem[] =
     userRole === 'PEDIATRA'
       ? [
           { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-          { id: 'sala-espera', label: 'Espera', icon: Activity },
+          currentDoctorHasAssistant
+            ? { id: 'sala-espera', label: 'Espera', icon: Activity }
+            : { id: 'agenda', label: 'Agenda', icon: Calendar },
           { id: 'consulta-activa', label: 'Consulta', icon: Stethoscope },
           { id: 'pacientes', label: 'Pacientes', icon: Users },
           { id: 'vacunas-carnet', label: 'Vacunas', icon: Syringe },

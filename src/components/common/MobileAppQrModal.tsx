@@ -36,7 +36,6 @@ export const MobileAppQrModal: React.FC<MobileAppQrModalProps> = ({ isOpen, onCl
 
     const fallbackOrigin =
       (typeof window !== 'undefined' &&
-        window.location.protocol !== 'capacitor:' &&
         window.location.hostname !== 'localhost' &&
         window.location.hostname !== '127.0.0.1'
         ? window.location.origin

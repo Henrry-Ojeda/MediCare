@@ -256,7 +256,9 @@ export interface RecipeTemplateConfig {
   rif: string;
   address: string;
   phone: string;
+  logoDataUrl?: string;
   logoPosition: 'left' | 'center' | 'right';
+  orientation?: 'vertical' | 'horizontal';
   fontFamily: 'Plus Jakarta Sans' | 'Serif Clásico' | 'Monospace Clínico';
   borderColor: '#0284C7' | '#059669' | '#7C3AED' | '#0F172A';
   showQrCode: boolean;

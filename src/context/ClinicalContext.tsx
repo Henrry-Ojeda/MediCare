@@ -27,7 +27,8 @@ import {
 } from '../data/mockClinicalData';
 import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationContext';
-import { calculateAgeInMonths, calculateBmi } from '../utils/pediatricCalculations';
+import { useNavigation } from './NavigationContext';
+import { calculateAgeInMonths, calculateBmi, calculateExactAgeLabel, evaluateOmsStatus } from '../utils/pediatricCalculations';
 import { getCurrentTimeLabel, getTodayIsoDate } from '../utils/formatters';
 import { clinicalSync } from '../api/clinicalSync';
 import { medicareApi } from '../api/medicareApi';
@@ -179,10 +180,7 @@ const ClinicalContext = createContext<ClinicalContextValue | undefined>(undefine
 export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, currentUser, userRole } = useAuth();
   const { showToast, pushNotification } = useNotifications();
-
-  const [currentView, setCurrentView] = useState<ViewId>(() =>
-    isAuthenticated ? 'dashboard' : 'login'
-  );
+  const { currentView, setCurrentView } = useNavigation();
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [doctors, setDoctors] = useState<DoctorProfile[]>([]);
   const [clinics, setClinics] = useState<ClinicProfile[]>([]);
@@ -218,7 +216,15 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [auditLogs] = useState<AuditLogEntry[]>([]);
   const [masterVaccines, setMasterVaccines] = useState<MasterVaccineItem[]>(INITIAL_MASTER_VACCINES);
-  const [templateConfig, setTemplateConfig] = useState<RecipeTemplateConfig>(INITIAL_TEMPLATE_CONFIG);
+  const [templateConfig, setTemplateConfig] = useState<RecipeTemplateConfig>(() => {
+    try {
+      const saved = localStorage.getItem('medicare_recipe_template_v1');
+      if (saved) return { ...INITIAL_TEMPLATE_CONFIG, ...JSON.parse(saved) };
+    } catch {
+      // ignore storage errors
+    }
+    return INITIAL_TEMPLATE_CONFIG;
+  });
   const [tenantConfig, setTenantConfig] = useState<ClinicTenantConfig>(INITIAL_TENANT_CONFIG);
   const [assistants, setAssistants] = useState<AssistantAssignment[]>([]);
 
@@ -356,26 +362,61 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentView('vacunas-carnet');
   };
 
+  const patientsRef = React.useRef<Patient[]>(patients);
+  patientsRef.current = patients;
+
   const navigateToActiveConsultation = (patientId: string) => {
-    const waitingApt = appointments.find(
-      (a) =>
-        a.patientId === patientId &&
-        (a.stage === 'en_sala' || a.stage === 'en_triaje' || a.stage === 'programado')
-    );
+    const todayIso = getTodayIsoDate();
+    const waitingApt =
+      appointments.find(
+        (a) =>
+          a.patientId === patientId &&
+          a.date === todayIso &&
+          a.stage !== 'completado'
+      ) ||
+      appointments.find(
+        (a) =>
+          a.patientId === patientId &&
+          (a.stage === 'en_sala' || a.stage === 'en_triaje' || a.stage === 'programado')
+      );
+
     if (waitingApt) {
-      updateAppointmentStage(waitingApt.id, 'en_consulta');
+      if (waitingApt.stage !== 'en_consulta') {
+        updateAppointmentStage(waitingApt.id, 'en_consulta');
+      }
+    } else {
+      const pat = patientsRef.current.find((p) => p.id === patientId);
+      if (pat) {
+        addAppointment({
+          patientId: pat.id,
+          patientName: `${pat.firstName} ${pat.lastName}`,
+          patientAgeLabel: calculateExactAgeLabel(pat.birthDate),
+          guardianName: pat.guardianName,
+          guardianWhatsapp: pat.guardianWhatsapp,
+          doctorId: currentUser?.id,
+          doctorName: currentUser?.name || 'Pediatra',
+          specialty: 'Pediatría',
+          date: todayIso,
+          time: getCurrentTimeLabel(),
+          durationMinutes: 30,
+          type: pat.consultations.length === 0 ? 'primera_vez' : 'control',
+          reason: 'Consulta directa en consultorio (sin cita previa)',
+          stage: 'en_consulta',
+        });
+      }
     }
     setSelectedPatientId(patientId);
     setCurrentView('consulta-activa');
   };
 
   const addPatient = (newPatientData: Omit<Patient, 'id' | 'historyNumber'>): Patient => {
-    const nextNum = 100 + patients.length + 1;
+    const nextNum = 100 + patientsRef.current.length + 1;
     const created: Patient = {
       ...newPatientData,
       id: `pat-${Date.now()}`,
       historyNumber: `HC-${new Date().getFullYear()}-0${nextNum}`,
     };
+    patientsRef.current = [created, ...patientsRef.current];
     setPatients((prev) => [created, ...prev]);
     setSelectedPatientId(created.id);
     clinicalSync.createPatient(newPatientData).catch(() => {});
@@ -836,16 +877,24 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setPatients((prev) =>
       prev.map((p) => {
         if (p.id !== patientId) return p;
+        const ageMonths = calculateAgeInMonths(p.birthDate);
         const bmi = calculateBmi(vitals.weightKg, vitals.heightCm);
+        const oms = evaluateOmsStatus(
+          vitals.weightKg,
+          vitals.heightCm,
+          ageMonths,
+          p.sex,
+          vitals.headCircumferenceCm
+        );
         const newGrowth = {
           date: consultation.date,
-          ageMonths: calculateAgeInMonths(p.birthDate),
+          ageMonths,
           weightKg: vitals.weightKg,
           heightCm: vitals.heightCm,
           headCircumferenceCm: vitals.headCircumferenceCm,
           bmi,
-          percentileWeight: 'P60',
-          percentileHeight: 'P62',
+          percentileWeight: oms.weightPercentile,
+          percentileHeight: oms.heightPercentile,
         };
         const updated: Patient = {
           ...p,
@@ -857,6 +906,10 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return updated;
       })
     );
+
+    const activeAppointment =
+      appointments.find((apt) => apt.patientId === patientId && apt.date === getTodayIsoDate() && apt.stage !== 'completado') ||
+      appointments.find((apt) => apt.patientId === patientId && apt.stage !== 'completado');
 
     setAppointments((prev) =>
       prev.map((apt) => (apt.patientId === patientId ? { ...apt, stage: 'completado' } : apt))
@@ -873,7 +926,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
       setDispatchModalConsultation({ patient: targetPat, consultation });
     }
-    clinicalSync.completeConsultation(patientId, consultation, vitals).catch(() => {});
+    clinicalSync.completeConsultation(patientId, consultation, vitals, activeAppointment?.id).catch(() => {});
   };
 
   const addPaymentRecord = (
@@ -1281,7 +1334,16 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         completeConsultation,
         refreshClinicalData,
         currentDoctorHasAssistant,
-        updateTemplateConfig: (partial) => setTemplateConfig((p) => ({ ...p, ...partial })),
+        updateTemplateConfig: (partial) =>
+          setTemplateConfig((p) => {
+            const next = { ...p, ...partial };
+            try {
+              localStorage.setItem('medicare_recipe_template_v1', JSON.stringify(next));
+            } catch {
+              // ignore storage errors
+            }
+            return next;
+          }),
         updateTenantConfig: (partial) => setTenantConfig((p) => ({ ...p, ...partial })),
         addPaymentRecord,
         updateBcvRate,

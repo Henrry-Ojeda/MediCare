@@ -9,7 +9,7 @@ namespace MediCare.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "MEDICO,PEDIATRA,ASISTENTE,SUPERADMIN")]
 public sealed class PatientsController : ControllerBase
 {
     private readonly DbConnectionFactory _db;

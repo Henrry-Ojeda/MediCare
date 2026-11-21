@@ -280,7 +280,7 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             <form
               onSubmit={handleSave}
-              className={`lg:col-span-7 space-y-4 ${editTab === 'preview' ? 'hidden lg:block' : ''}`}
+              className={`lg:col-span-7 min-w-0 space-y-4 ${editTab === 'preview' ? 'hidden lg:block' : ''}`}
             >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -331,11 +331,11 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
                 <Plus className="w-3.5 h-3.5" /> Agregar Línea Manual
               </button>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 min-w-0">
               <select
                 value={selectedDrugName}
                 onChange={(e) => setSelectedDrugName(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium"
+                className="flex-1 min-w-0 w-full truncate px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium"
               >
                 {PEDIATRIC_DRUG_FORMULAS.map((drug) => (
                   <option key={drug.name} value={drug.name}>
@@ -476,7 +476,7 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="sticky bottom-0 bg-white flex justify-end gap-2 pt-3 pb-1 border-t border-slate-100 z-10">
             <button
               type="button"
               onClick={onClose}
@@ -495,7 +495,7 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
         </form>
 
             <div
-              className={`lg:col-span-5 bg-slate-100/80 border border-slate-200 rounded-2xl p-3 space-y-2.5 ${
+              className={`lg:col-span-5 min-w-0 bg-slate-100/80 border border-slate-200 rounded-2xl p-3 space-y-2.5 ${
                 editTab === 'form' ? 'hidden lg:block' : ''
               }`}
             >
@@ -524,14 +524,16 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
                   </button>
                 </div>
               </div>
-              <div className="max-h-[65vh] overflow-auto flex justify-center">
-                <RecipeDocumentPreview
-                  patient={patient}
-                  consultation={draftConsultation}
-                  templateConfig={templateConfig}
-                  doctorSignature={doctorSignature}
-                  activePage={activePdfPage}
-                />
+              <div className="overflow-x-auto flex justify-center">
+                <div className="origin-top scale-[0.78] sm:scale-[0.82] -mb-20">
+                  <RecipeDocumentPreview
+                    patient={patient}
+                    consultation={draftConsultation}
+                    templateConfig={templateConfig}
+                    doctorSignature={doctorSignature}
+                    activePage={activePdfPage}
+                  />
+                </div>
               </div>
             </div>
           </div>

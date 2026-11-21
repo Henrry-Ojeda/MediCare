@@ -265,12 +265,15 @@ export const UserProfileView: React.FC = () => {
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-slate-600 mb-1">
-              Nueva Clave de Acceso (opcional)
+            <label htmlFor="profile-new-password" className="block text-xs font-semibold text-slate-600 mb-1">
+              Nueva Clave de Acceso (opcional, mínimo 8 caracteres)
             </label>
             <input
+              id="profile-new-password"
+              name="newPassword"
               type="password"
-              minLength={4}
+              autoComplete="new-password"
+              minLength={8}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Dejar vacío para mantener la clave actual"
@@ -407,10 +410,13 @@ export const UserProfileView: React.FC = () => {
                     className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
                   />
                   <input
+                    id="assistant-password"
+                    name="assistantPassword"
                     type="password"
+                    autoComplete="new-password"
                     required
-                    minLength={4}
-                    placeholder="Clave de acceso *"
+                    minLength={8}
+                    placeholder="Clave de acceso (mín. 8 caracteres) *"
                     value={asistPassword}
                     onChange={(e) => setAsistPassword(e.target.value)}
                     className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs"
