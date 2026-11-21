@@ -14,6 +14,7 @@ export type ViewId =
   | 'onboarding'             // Onboarding y Setup Inicial (Sprint 2)
   | 'perfil'                 // Perfil de Usuario
   | 'firma-medico'           // Firma del Médico y Sello Digital
+  | 'ia-modulo'              // Módulo IA (Gemini por médico)
   | 'admin-usuarios'         // Gestión de Personal y Asistentes (Admin)
   | 'admin-doctores'         // CRUD de Doctores (Admin)
   | 'admin-asistentes'       // CRUD de Asistentes y Asignación M:N (Admin)
@@ -269,6 +270,11 @@ export interface RecipeTemplateConfig {
   leftColumnTitle?: string;
   rightColumnTitle?: string;
   showDiagnosisOnRecipe?: boolean;
+  backgroundTemplateDataUrl?: string;
+  backgroundOpacity?: number;
+  contentTopPaddingPx?: number;
+  contentBottomPaddingPx?: number;
+  hideDefaultHeaderOnBg?: boolean;
 }
 
 export interface ClinicTenantConfig {

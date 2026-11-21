@@ -54,6 +54,7 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
       patientName,
       patientAge,
       weightKg,
+      userId: currentUser?.id,
     });
     onApplyAiResult(res.data, transcript);
     showToast(
