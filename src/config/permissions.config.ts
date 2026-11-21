@@ -31,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
       'consulta-activa',
       'firma-medico',
       'plantillas',
+      'configuracion',
       'perfil',
     ],
     canCallAssistant: true,
