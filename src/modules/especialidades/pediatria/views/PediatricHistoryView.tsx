@@ -126,6 +126,9 @@ export const PediatricHistoryView: React.FC = () => {
     { id: 'oms', label: 'Curvas de Crecimiento OMS', icon: <TrendingUp className="w-4 h-4" /> },
   ];
 
+  const latestConsultation = selectedPatient.consultations[0];
+  const latestWithRecipe = selectedPatient.consultations.find((c) => c.prescriptions.length > 0);
+
   return (
     <div className="max-w-6xl mx-auto space-y-5">
       <PatientClinicalHeader
@@ -135,6 +138,55 @@ export const PediatricHistoryView: React.FC = () => {
         onOpenVaccines={() => setActiveTab('vaccines')}
         onCreateRecipe={userRole === 'PEDIATRA' ? () => setIsRecipeModalOpen(true) : undefined}
       />
+
+      {/* Resumen Clínico Rápido */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-400 uppercase">Últimas Medidas</p>
+          <p className="text-sm font-bold text-slate-900 mt-1">
+            {selectedPatient.latestVitals
+              ? `${selectedPatient.latestVitals.weightKg} kg · ${selectedPatient.latestVitals.heightCm} cm`
+              : 'Sin registro reciente'}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {selectedPatient.latestVitals?.recordedAt || 'Pendiente de toma en consulta'}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs">
+          <p className="text-[11px] font-bold text-slate-400 uppercase">Último Diagnóstico</p>
+          <p className="text-sm font-bold text-slate-900 mt-1 truncate">
+            {latestConsultation ? latestConsultation.cie10Name : 'Sin consultas registradas'}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {latestConsultation ? `${latestConsultation.date} · ${latestConsultation.doctorName}` : 'Primera consulta pendiente'}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-slate-400 uppercase">Último Récipe</p>
+            <p className="text-xs font-bold text-slate-900 mt-1 truncate">
+              {latestWithRecipe
+                ? `${latestWithRecipe.prescriptions.length} medicamento(s) · ${latestWithRecipe.date}`
+                : 'Sin récipes previos'}
+            </p>
+          </div>
+          {userRole === 'PEDIATRA' && (
+            <button
+              type="button"
+              onClick={() =>
+                latestWithRecipe
+                  ? openDispatchModal(selectedPatient, latestWithRecipe)
+                  : setIsRecipeModalOpen(true)
+              }
+              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shrink-0 cursor-pointer"
+            >
+              {latestWithRecipe ? 'Ver / Reenviar' : 'Hacer Récipe'}
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="flex overflow-x-auto gap-2 pb-1">
         {tabs.map((tab) => {

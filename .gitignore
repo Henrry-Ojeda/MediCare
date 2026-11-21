@@ -17,3 +17,7 @@ obj/
 android/keystore.properties
 .vscode/
 .vercel
+Backend/MediCare.API/appsettings.*.local.json
+Backend/MediCare.API/appsettings.Local.json
+playwright-report/
+test-results/

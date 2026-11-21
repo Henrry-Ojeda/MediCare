@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { NavigationProvider } from './context/NavigationContext';
 import { ClinicalProvider, useClinical } from './context/ClinicalContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { TriageModal } from './modules/agenda';
@@ -100,7 +101,7 @@ const ViewLoadingFallback: React.FC = () => (
 
 const AuthenticatedRouter: React.FC = () => {
   const { isAuthenticated, userRole } = useAuth();
-  const { currentView, setCurrentView } = useClinical();
+  const { currentView, setCurrentView, currentDoctorHasAssistant } = useClinical();
 
   if (!isAuthenticated) {
     return (
@@ -130,6 +131,9 @@ const AuthenticatedRouter: React.FC = () => {
       case 'agenda':
         return <AgendaView />;
       case 'sala-espera':
+        if (userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
+          return <DashboardView />;
+        }
         return <WaitingRoomView />;
       case 'pacientes':
         return <PatientDirectoryView />;
@@ -203,9 +207,11 @@ export function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <ClinicalProvider>
-          <AuthenticatedRouter />
-        </ClinicalProvider>
+        <NavigationProvider>
+          <ClinicalProvider>
+            <AuthenticatedRouter />
+          </ClinicalProvider>
+        </NavigationProvider>
       </NotificationProvider>
     </AuthProvider>
   );

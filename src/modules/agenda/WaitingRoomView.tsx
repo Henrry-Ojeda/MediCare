@@ -58,6 +58,7 @@ export const WaitingRoomView: React.FC = () => {
   const { userRole, currentUser } = useAuth();
   const {
     appointments,
+    patients,
     doctors,
     currentDoctorHasAssistant,
     updateAppointmentStage,
@@ -68,7 +69,7 @@ export const WaitingRoomView: React.FC = () => {
     sendPatientToConsultorio,
     setCurrentView,
   } = useClinical();
-  const { showToast, pushNotification } = useNotifications();
+  const { showToast, callAssistantFromConsultorio } = useNotifications();
 
   const [mobileStage, setMobileStage] = useState<WaitingRoomStage>('en_sala');
   const [calledBanner, setCalledBanner] = useState<string | null>(null);
@@ -76,10 +77,26 @@ export const WaitingRoomView: React.FC = () => {
   const [doctorFilterId, setDoctorFilterId] = useState<string>('ALL');
 
   // Ingreso rápido por Nombre (Asistente / Recepción)
+  const [quickPatientId, setQuickPatientId] = useState<string | undefined>(undefined);
   const [quickName, setQuickName] = useState('');
   const [quickIdDoc, setQuickIdDoc] = useState('');
   const [quickReason, setQuickReason] = useState('');
   const [quickDoctorId, setQuickDoctorId] = useState('');
+  const [quickType, setQuickType] = useState<'control' | 'urgencia'>('control');
+  const [showQuickMatches, setShowQuickMatches] = useState(false);
+
+  const quickMatchingPatients =
+    quickName.trim().length >= 2 || quickIdDoc.trim().length >= 2
+      ? patients
+          .filter((p) => {
+            const qName = quickName.trim().toLowerCase();
+            const qDoc = quickIdDoc.trim().toLowerCase();
+            const full = `${p.firstName} ${p.lastName} ${p.guardianName}`.toLowerCase();
+            const doc = (p.idDocument || p.guardianIdDocument || p.historyNumber || '').toLowerCase();
+            return (qName && full.includes(qName)) || (qDoc && doc.includes(qDoc));
+          })
+          .slice(0, 5)
+      : [];
 
   useEffect(() => {
     const interval = setInterval(() => setLiveExtraMinutes((m) => m + 1), 60000);
@@ -88,16 +105,21 @@ export const WaitingRoomView: React.FC = () => {
 
   const handleQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickName.trim()) return;
+    if (!quickName.trim() && !quickPatientId) return;
     quickAddToWaitingRoom({
+      patientId: quickPatientId,
       fullName: quickName,
       idDocument: quickIdDoc,
       reason: quickReason,
       doctorId: quickDoctorId || doctors[0]?.id,
+      type: quickType,
     });
+    setQuickPatientId(undefined);
     setQuickName('');
     setQuickIdDoc('');
     setQuickReason('');
+    setQuickType('control');
+    setShowQuickMatches(false);
     setMobileStage('en_sala');
   };
 
@@ -105,16 +127,11 @@ export const WaitingRoomView: React.FC = () => {
     setCalledBanner(patientName);
     playClinicalChime('patient');
     updateAppointmentStage(appointmentId, 'en_consulta');
-    pushNotification({
-      title: 'Llamado a Siguiente Paciente',
-      message: `${currentUser?.name || 'La Doctora'} solicita pasar a ${patientName} al consultorio.`,
-      category: 'assistant_call',
-      priority: 'high',
-      targetRoles: ['ASISTENTE'],
-      patientId,
-      appointmentId,
-    });
+    callAssistantFromConsultorio('Solicita pasar al consultorio', patientName);
     showToast(`Llamando a consultorio: ${patientName} (Asistente notificado)`);
+    if (userRole === 'PEDIATRA') {
+      navigateToActiveConsultation(patientId);
+    }
     setTimeout(() => setCalledBanner(null), 5000);
   };
 
@@ -187,51 +204,106 @@ export const WaitingRoomView: React.FC = () => {
         </div>
 
         {ROLE_PERMISSIONS[userRole].canCreatePatient && (
-          <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <input
-              type="text"
-              required
-              placeholder="Nombre completo del paciente *"
-              value={quickName}
-              onChange={(e) => setQuickName(e.target.value)}
-              className="sm:col-span-4 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:bg-white focus:outline-none focus:border-[#0284C7]"
-            />
-            <input
-              type="text"
-              placeholder="Cédula / Doc."
-              value={quickIdDoc}
-              onChange={(e) => setQuickIdDoc(e.target.value)}
-              className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
-            />
-            <input
-              type="text"
-              placeholder="Motivo (ej. Control)"
-              value={quickReason}
-              onChange={(e) => setQuickReason(e.target.value)}
-              className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
-            />
-            <select
-              value={quickDoctorId || doctors[0]?.id || ''}
-              onChange={(e) => setQuickDoctorId(e.target.value)}
-              className="sm:col-span-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0284C7]"
-            >
-              {doctors.length === 0 ? (
-                <option value="">Pediatra por defecto</option>
-              ) : (
-                doctors.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))
-              )}
-            </select>
-            <button
-              type="submit"
-              className="sm:col-span-2 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#059669] hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Agregar a Sala</span>
-            </button>
+          <form onSubmit={handleQuickAdd} className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+              <div className="sm:col-span-3 relative">
+                <input
+                  type="text"
+                  required
+                  placeholder="Buscar o escribir nombre del paciente *"
+                  value={quickName}
+                  onFocus={() => setShowQuickMatches(true)}
+                  onChange={(e) => {
+                    setQuickName(e.target.value);
+                    setQuickPatientId(undefined);
+                    setShowQuickMatches(true);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-medium focus:bg-white focus:outline-none focus:border-[#0284C7]"
+                />
+                {showQuickMatches && quickMatchingPatients.length > 0 && !quickPatientId && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    {quickMatchingPatients.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setQuickPatientId(p.id);
+                          setQuickName(`${p.firstName} ${p.lastName}`);
+                          setQuickIdDoc(p.idDocument || p.guardianIdDocument || '');
+                          setShowQuickMatches(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-sky-50 text-xs border-b border-slate-100 last:border-b-0 cursor-pointer"
+                      >
+                        <div className="font-bold text-slate-900">
+                          {p.firstName} {p.lastName}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {p.historyNumber} · Rep: {p.guardianName}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <input
+                type="text"
+                placeholder="Cédula / Doc."
+                value={quickIdDoc}
+                onChange={(e) => setQuickIdDoc(e.target.value)}
+                className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
+              />
+              <input
+                type="text"
+                placeholder="Motivo (ej. Control)"
+                value={quickReason}
+                onChange={(e) => setQuickReason(e.target.value)}
+                className="sm:col-span-2 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-[#0284C7]"
+              />
+              <select
+                value={quickType}
+                onChange={(e) => setQuickType(e.target.value as 'control' | 'urgencia')}
+                className={`sm:col-span-1 px-2.5 py-2.5 rounded-xl border text-xs font-bold focus:outline-none ${
+                  quickType === 'urgencia'
+                    ? 'border-rose-300 bg-rose-50 text-rose-700'
+                    : 'border-slate-200 bg-slate-50 text-slate-700'
+                }`}
+                title="Prioridad de atención"
+              >
+                <option value="control">Normal</option>
+                <option value="urgencia">Urgente</option>
+              </select>
+              <select
+                value={quickDoctorId || doctors[0]?.id || ''}
+                onChange={(e) => setQuickDoctorId(e.target.value)}
+                className="sm:col-span-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold focus:bg-white focus:outline-none focus:border-[#0284C7]"
+              >
+                {doctors.length === 0 ? (
+                  <option value="">Pediatra por defecto</option>
+                ) : (
+                  doctors.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))
+                )}
+              </select>
+              <button
+                type="submit"
+                className={`sm:col-span-2 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-white text-xs font-bold cursor-pointer ${
+                  quickType === 'urgencia'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-[#059669] hover:bg-emerald-700'
+                }`}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>{quickType === 'urgencia' ? 'Ingreso Urgente' : 'Agregar a Sala'}</span>
+              </button>
+            </div>
+            {quickPatientId && (
+              <p className="text-[11px] font-semibold text-emerald-700">
+                Paciente existente seleccionado ({quickName}). Se agregará directo a sala de espera.
+              </p>
+            )}
           </form>
         )}
 
@@ -305,11 +377,17 @@ export const WaitingRoomView: React.FC = () => {
       {/* Tablero Kanban: 4 columnas en xl, columna activa en móvil/tablet */}
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 items-start">
         {COLUMNS.map((col) => {
-          const colItems = appointments.filter(
-            (a) =>
-              a.stage === col.id &&
-              (doctorFilterId === 'ALL' || a.doctorId === doctorFilterId)
-          );
+          const colItems = appointments
+            .filter(
+              (a) =>
+                a.stage === col.id &&
+                (doctorFilterId === 'ALL' || a.doctorId === doctorFilterId)
+            )
+            .sort((a, b) => {
+              if (a.type === 'urgencia' && b.type !== 'urgencia') return -1;
+              if (a.type !== 'urgencia' && b.type === 'urgencia') return 1;
+              return 0;
+            });
           const hiddenOnMobile = mobileStage !== col.id ? 'hidden xl:flex' : 'flex';
           return (
             <div
@@ -339,7 +417,14 @@ export const WaitingRoomView: React.FC = () => {
                       className="p-3.5 rounded-xl border border-slate-200/90 bg-white shadow-2xs space-y-2.5"
                     >
                       <div className="flex items-center justify-between text-[11px] font-mono">
-                        <span className="font-bold text-slate-700">{apt.time}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-700">{apt.time}</span>
+                          {apt.type === 'urgencia' && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-bold uppercase">
+                              URGENTE
+                            </span>
+                          )}
+                        </div>
                         {(col.id === 'en_sala' || col.id === 'en_triaje') && (
                           <span className="text-amber-600 font-semibold flex items-center gap-1">
                             <Clock className="w-3 h-3" />

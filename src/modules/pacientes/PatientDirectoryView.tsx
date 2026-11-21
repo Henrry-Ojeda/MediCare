@@ -1,6 +1,7 @@
-import React from 'react';
-import { UserPlus, Phone, Syringe, FileText, Stethoscope } from 'lucide-react';
+import React, { useState } from 'react';
+import { UserPlus, Phone, Syringe, FileText, Stethoscope, Pill } from 'lucide-react';
 import { DataTable, AllergyAlertBadge } from '../../components/common';
+import { CreateRecipeModal } from '../../components/recipe/CreateRecipeModal';
 import { useClinical } from '../../context/ClinicalContext';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_PERMISSIONS } from '../../config/permissions.config';
@@ -9,14 +10,16 @@ import { calculateExactAgeLabel } from '../../utils/pediatricCalculations';
 import { normalizeWhatsappPhone } from '../../utils/whatsappFormatter';
 
 export const PatientDirectoryView: React.FC = () => {
-  const { userRole } = useAuth();
+  const { userRole, currentUser } = useAuth();
   const {
     patients,
     setCurrentView,
     navigateToPatient360,
     navigateToPatientVaccines,
     navigateToActiveConsultation,
+    completeConsultation,
   } = useClinical();
+  const [recipePatient, setRecipePatient] = useState<Patient | null>(null);
 
   return (
     <div className="space-y-4">
@@ -120,20 +123,57 @@ export const PatientDirectoryView: React.FC = () => {
                   <span>Historial</span>
                 </button>
                 {userRole === 'PEDIATRA' && (
-                  <button
-                    type="button"
-                    onClick={() => navigateToActiveConsultation(patient.id)}
-                    className="px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <Stethoscope className="w-3.5 h-3.5" />
-                    <span>Consulta</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setRecipePatient(patient)}
+                      className="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-semibold text-emerald-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Pill className="w-3.5 h-3.5" />
+                      <span>Récipe</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToActiveConsultation(patient.id)}
+                      className="px-3 py-1.5 rounded-lg bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Stethoscope className="w-3.5 h-3.5" />
+                      <span>Consulta</span>
+                    </button>
+                  </>
                 )}
               </div>
             ),
           },
         ]}
       />
+
+      {recipePatient && (
+        <CreateRecipeModal
+          isOpen={Boolean(recipePatient)}
+          onClose={() => setRecipePatient(null)}
+          patient={recipePatient}
+          onSaveRecipe={(saved) => {
+            completeConsultation(
+              recipePatient.id,
+              saved.consultation,
+              recipePatient.latestVitals || {
+                weightKg: 0,
+                heightCm: 0,
+                headCircumferenceCm: 0,
+                temperatureC: 0,
+                heartRateBpm: 0,
+                spo2Percent: 0,
+                systolicBp: 0,
+                diastolicBp: 0,
+                recordedAt: 'Ahora',
+                recordedBy: currentUser?.name || 'Pediatra',
+              }
+            );
+            setRecipePatient(null);
+          }}
+        />
+      )}
     </div>
   );
 };

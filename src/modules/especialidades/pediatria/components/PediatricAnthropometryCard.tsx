@@ -1,21 +1,53 @@
 import React from 'react';
-import { Activity, Scale } from 'lucide-react';
-import { VitalSigns } from '../../../../types/patient.types';
-import { calculateBmi, evaluateOmsStatus } from '../../../../utils/pediatricCalculations';
+import { Activity, AlertTriangle, CheckCircle2, Scale } from 'lucide-react';
+import { GrowthMeasurement, VitalSigns } from '../../../../types/patient.types';
+import {
+  calculateBmi,
+  evaluateGrowthTrend,
+  evaluateOmsStatus,
+} from '../../../../utils/pediatricCalculations';
+
+export interface AnthropometryVisibleFields {
+  respiratoryRate?: boolean;
+  headCircumference?: boolean;
+  bloodPressure?: boolean;
+  spo2?: boolean;
+}
 
 interface PediatricAnthropometryCardProps {
   vitals: VitalSigns;
   ageMonths: number;
+  sex?: 'M' | 'F';
+  previousGrowth?: GrowthMeasurement;
+  visibleFields?: AnthropometryVisibleFields;
   onChange: (updated: VitalSigns) => void;
 }
 
 export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProps> = ({
   vitals,
   ageMonths,
+  sex = 'M',
+  previousGrowth,
+  visibleFields = { respiratoryRate: true, headCircumference: true, bloodPressure: true, spo2: true },
   onChange,
 }) => {
   const bmi = calculateBmi(vitals.weightKg, vitals.heightCm);
-  const oms = evaluateOmsStatus(vitals.weightKg, vitals.heightCm, ageMonths);
+  const oms = evaluateOmsStatus(
+    vitals.weightKg,
+    vitals.heightCm,
+    ageMonths,
+    sex,
+    vitals.headCircumferenceCm
+  );
+  const trend = evaluateGrowthTrend(
+    {
+      weightKg: vitals.weightKg,
+      heightCm: vitals.heightCm,
+      headCircumferenceCm: vitals.headCircumferenceCm,
+    },
+    previousGrowth,
+    ageMonths
+  );
 
   const updateField = (field: keyof VitalSigns, value: number) => {
     onChange({
@@ -73,15 +105,17 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
             }`}
           />
         </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">SpO₂ (%)</label>
-          <input
-            type="number"
-            value={vitals.spo2Percent}
-            onChange={(e) => updateField('spo2Percent', parseInt(e.target.value, 10))}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-          />
-        </div>
+        {visibleFields.spo2 !== false && (
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">SpO₂ (%)</label>
+            <input
+              type="number"
+              value={vitals.spo2Percent}
+              onChange={(e) => updateField('spo2Percent', parseInt(e.target.value, 10))}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+            />
+          </div>
+        )}
         <div>
           <label className="block text-[11px] font-semibold text-slate-500 mb-1">FC (lpm)</label>
           <input
@@ -91,41 +125,90 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
             className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
           />
         </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">P. Cefálico (cm)</label>
-          <input
-            type="number"
-            step="0.1"
-            value={vitals.headCircumferenceCm ?? ''}
-            onChange={(e) => updateField('headCircumferenceCm', parseFloat(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">PA Sistólica</label>
-          <input
-            type="number"
-            value={vitals.systolicBp}
-            onChange={(e) => updateField('systolicBp', parseInt(e.target.value, 10))}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-slate-500 mb-1">PA Diastólica</label>
-          <input
-            type="number"
-            value={vitals.diastolicBp}
-            onChange={(e) => updateField('diastolicBp', parseInt(e.target.value, 10))}
-            className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
-          />
-        </div>
+        {visibleFields.respiratoryRate !== false && (
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">FR (rpm)</label>
+            <input
+              type="number"
+              value={vitals.respiratoryRateRpm ?? ''}
+              onChange={(e) => updateField('respiratoryRateRpm', parseInt(e.target.value, 10))}
+              placeholder="Ej. 24"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+            />
+          </div>
+        )}
+        {visibleFields.headCircumference !== false && (
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">P. Cefálico (cm)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={vitals.headCircumferenceCm ?? ''}
+              onChange={(e) => updateField('headCircumferenceCm', parseFloat(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+            />
+          </div>
+        )}
+        {visibleFields.bloodPressure !== false && (
+          <>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">PA Sistólica</label>
+              <input
+                type="number"
+                value={vitals.systolicBp}
+                onChange={(e) => updateField('systolicBp', parseInt(e.target.value, 10))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">PA Diastólica</label>
+              <input
+                type="number"
+                value={vitals.diastolicBp}
+                onChange={(e) => updateField('diastolicBp', parseInt(e.target.value, 10))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-900"
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="flex items-center gap-2 text-[11px] text-slate-500">
-        <Activity className="w-3.5 h-3.5 text-emerald-600" />
-        <span>
-          Evaluación OMS ({ageMonths} meses): <strong>{oms.statusLabel}</strong> • Percentil {oms.percentileLabel}
-        </span>
+      <div className="space-y-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+          <Activity className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span>
+            Evaluación OMS ({ageMonths} m · {sex === 'F' ? 'Niña' : 'Niño'}):{' '}
+            <strong>{oms.statusLabel}</strong> · Peso {oms.weightPercentile} · Talla{' '}
+            {oms.heightPercentile}
+            {oms.headStatusLabel ? ` · ${oms.headStatusLabel}` : ''}
+          </span>
+        </div>
+
+        {trend.hasPrevious && (
+          <div
+            className={`rounded-xl px-3 py-2 text-xs flex items-start gap-2 border ${
+              trend.isNormalGrowth
+                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50 border-amber-200 text-amber-900'
+            }`}
+          >
+            {trend.isNormalGrowth ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <p className="font-bold">{trend.summary}</p>
+              {trend.alerts.length > 0 && (
+                <ul className="list-disc list-inside text-[11px] mt-0.5 space-y-0.5">
+                  {trend.alerts.map((al) => (
+                    <li key={al}>{al}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

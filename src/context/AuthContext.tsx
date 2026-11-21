@@ -1,7 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthUser, DoctorSignatureConfig, UserRole } from '../types/auth.types';
 import { medicareApi } from '../api/medicareApi';
-import { getAuthToken } from '../api/client';
+import { getAuthToken, setAuthToken, UNAUTHORIZED_EVENT } from '../api/client';
+
+function isJwtExpired(token: string | null): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64)) as { exp?: number };
+    if (typeof payload.exp === 'number') {
+      return payload.exp * 1000 <= Date.now();
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 const USER_STORAGE_KEY = 'medicare_current_user';
 const SIGNATURE_STORAGE_KEY = 'medicare_doctor_signature_v1';
@@ -41,12 +57,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const raw = localStorage.getItem(USER_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as AuthUser;
-        if (parsed && (getAuthToken() || parsed.id?.startsWith('demo-'))) {
+        const token = getAuthToken();
+        if (parsed && ((token && !isJwtExpired(token)) || parsed.id?.startsWith('demo-'))) {
           return {
             ...parsed,
             role: parsed.role || mapRoleCodeToUserRole(parsed.roleCode),
           };
         }
+        setAuthToken(null);
+        localStorage.removeItem(USER_STORAGE_KEY);
       }
     } catch {
       // ignore storage errors
@@ -116,6 +135,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      medicareApi.logout();
+      setCurrentUserState(null);
+      setIsAuthenticated(false);
+      try {
+        localStorage.removeItem(USER_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);
+  }, []);
 
   const userRole: UserRole = currentUser?.role || mapRoleCodeToUserRole(currentUser?.roleCode);
 

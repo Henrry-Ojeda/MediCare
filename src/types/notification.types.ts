@@ -21,6 +21,7 @@ export interface AppNotification {
   read: boolean;
   patientId?: string;
   appointmentId?: string;
+  targetUserId?: string;
 }
 
 export interface AssistantCallAlert {
