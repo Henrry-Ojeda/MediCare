@@ -153,6 +153,29 @@ export const clinicalSync = {
     });
   },
 
+  async updatePatient(id: string, patient: Omit<Patient, 'id' | 'historyNumber'>) {
+    if (!hasRealAuthSession()) return;
+    await medicareApi.updatePatient(id, {
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      sex: patient.sex,
+      birthDate: patient.birthDate,
+      idDocument: patient.idDocument,
+      bloodType: patient.bloodType,
+      primarySpecialtyId: 1,
+      criticalAllergies: patient.criticalAllergies,
+      chronicConditions: patient.chronicConditions,
+      previousHospitalizations: patient.previousHospitalizations,
+      guardianName: patient.guardianName,
+      guardianRelation: patient.guardianRelation,
+      guardianIdDocument: patient.guardianIdDocument,
+      guardianOccupation: patient.guardianOccupation,
+      guardianWhatsapp: patient.guardianWhatsapp,
+      guardianEmail: patient.guardianEmail,
+      specialtyData: patient.perinatal,
+    });
+  },
+
   async updateAppointmentStage(appointmentId: string, stage: WaitingRoomStage) {
     if (!hasRealAuthSession()) return;
     await medicareApi.updateAppointmentStage(appointmentId, stage);

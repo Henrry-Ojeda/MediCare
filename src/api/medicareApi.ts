@@ -76,6 +76,12 @@ export const medicareApi = {
       body: JSON.stringify(payload),
     }),
 
+  updatePatient: (id: string, payload: Record<string, unknown>) =>
+    apiFetch<Record<string, unknown>>(`/patients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
   grantDiagnosisPermission: (patientId: string, payload: Record<string, unknown>) =>
     apiFetch<Record<string, unknown>>(`/patients/${patientId}/diagnosis-permissions`, {
       method: 'POST',
