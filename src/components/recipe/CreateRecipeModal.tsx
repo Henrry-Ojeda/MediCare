@@ -252,11 +252,11 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
       onClose={onClose}
       title={step === 'edit' ? 'Crear Récipe Médico' : 'Récipe Guardado — Listo para Enviar'}
       subtitle={`Paciente: ${patient.firstName} ${patient.lastName} · Peso: ${effectiveWeight || 'N/A'} kg`}
-      maxWidthClass="max-w-6xl"
+      maxWidthClass="max-w-4xl"
     >
       {step === 'edit' ? (
-        <div className="space-y-3">
-          <div className="flex lg:hidden items-center bg-slate-100 p-1 rounded-xl">
+        <div className="space-y-4">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl max-w-md">
             <button
               type="button"
               onClick={() => setEditTab('form')}
@@ -277,10 +277,10 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <div>
             <form
               onSubmit={handleSave}
-              className={`lg:col-span-7 min-w-0 space-y-4 ${editTab === 'preview' ? 'hidden lg:block' : ''}`}
+              className={`min-w-0 space-y-4 ${editTab === 'preview' ? 'hidden' : ''}`}
             >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -476,7 +476,7 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
             </div>
           </div>
 
-          <div className="sticky bottom-0 bg-white flex justify-end gap-2 pt-3 pb-1 border-t border-slate-100 z-10">
+          <div className="bg-white flex justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
@@ -495,8 +495,8 @@ export const CreateRecipeModal: React.FC<CreateRecipeModalProps> = ({
         </form>
 
             <div
-              className={`lg:col-span-5 min-w-0 bg-slate-100/80 border border-slate-200 rounded-2xl p-3 space-y-2.5 ${
-                editTab === 'form' ? 'hidden lg:block' : ''
+              className={`min-w-0 bg-slate-100/80 border border-slate-200 rounded-2xl p-4 space-y-3 ${
+                editTab === 'form' ? 'hidden' : ''
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">

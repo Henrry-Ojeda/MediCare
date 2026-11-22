@@ -31,6 +31,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
       'consulta-activa',
       'firma-medico',
       'plantillas',
+      'ia-modulo',
+      'configuracion',
       'perfil',
     ],
     canCallAssistant: true,
@@ -73,6 +75,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
       'admin-doctores',
       'admin-asistentes',
       'admin-clinicas',
+      'ia-modulo',
       'configuracion',
       'perfil',
     ],
@@ -99,6 +102,7 @@ const FEATURE_GATED_VIEWS: Partial<Record<ViewId, boolean>> = {
   epidemiologia: FEATURE_FLAGS.enableAdvancedReports,
   auditoria: FEATURE_FLAGS.enableAuditLog,
   onboarding: FEATURE_FLAGS.enableOnboarding,
+  'ia-modulo': FEATURE_FLAGS.enableAiModule,
   plantillas: true,
 };
 

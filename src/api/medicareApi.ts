@@ -76,6 +76,12 @@ export const medicareApi = {
       body: JSON.stringify(payload),
     }),
 
+  updatePatient: (id: string, payload: Record<string, unknown>) =>
+    apiFetch<Record<string, unknown>>(`/patients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
   grantDiagnosisPermission: (patientId: string, payload: Record<string, unknown>) =>
     apiFetch<Record<string, unknown>>(`/patients/${patientId}/diagnosis-permissions`, {
       method: 'POST',
@@ -205,12 +211,26 @@ export const medicareApi = {
 
   getAuditLogs: () => apiFetch<unknown[]>('/reports/audit-logs'),
 
+  testAiConnection: (payload: { apiKey?: string; model?: string }) =>
+    apiFetch<{ ok: boolean; model: string; message: string }>('/ai/test-connection', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  analyzeRecipeImage: (payload: { imageDataUrl: string; apiKey?: string; model?: string }) =>
+    apiFetch<{ source: string; data: Record<string, unknown> }>('/ai/analyze-recipe-image', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
   processConsultationAi: (payload: {
     transcript: string;
     patientName?: string;
     patientAge?: string;
     weightKg?: number;
     specialty?: string;
+    apiKey?: string;
+    model?: string;
   }) =>
     apiFetch<{ source: string; data: unknown }>('/ai/process-consultation', {
       method: 'POST',

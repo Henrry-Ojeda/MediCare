@@ -5,6 +5,8 @@ import { DictationAiResult } from '../../../../types/consultation.types';
 import { DEMO_DICTATION_SCRIPTS } from '../../../../data/mockClinicalData';
 import { useNotifications } from '../../../../context/NotificationContext';
 import { useAuth } from '../../../../context/AuthContext';
+import { useClinical } from '../../../../context/ClinicalContext';
+import { FEATURE_FLAGS } from '../../../../config/featureFlags';
 
 interface ClinicalDictationBarProps {
   patientName: string;
@@ -40,6 +42,8 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
   const { currentUser } = useAuth();
   const [showTranscriptBox, setShowTranscriptBox] = useState(true);
 
+  const { currentDoctorHasAssistant } = useClinical();
+
   const formatTimer = (sec: number) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
     const s = (sec % 60).toString().padStart(2, '0');
@@ -51,6 +55,7 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
       patientName,
       patientAge,
       weightKg,
+      userId: currentUser?.id,
     });
     onApplyAiResult(res.data, transcript);
     showToast(
@@ -123,24 +128,28 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
             </>
           )}
 
-          <button
-            type="button"
-            disabled={status === 'processing' || !transcript.trim()}
-            onClick={handleProcess}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-xs font-bold transition-colors"
-          >
-            <Sparkles className="w-4 h-4" />
-            {status === 'processing' ? 'Estructurando...' : 'Estructurar con IA'}
-          </button>
+          {FEATURE_FLAGS.enableAiModule && (
+            <button
+              type="button"
+              disabled={status === 'processing' || !transcript.trim()}
+              onClick={handleProcess}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-xs font-bold transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              {status === 'processing' ? 'Estructurando...' : 'Estructurar con IA'}
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={handleCallAssistant}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-xs font-bold transition-colors"
-            title="Enviar alerta sonora al asistente"
-          >
-            <BellRing className="w-4 h-4" /> Llamar Asistente
-          </button>
+          {FEATURE_FLAGS.enableAssistantCall && currentDoctorHasAssistant && (
+            <button
+              type="button"
+              onClick={handleCallAssistant}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-200 text-xs font-bold transition-colors"
+              title="Enviar alerta sonora al asistente"
+            >
+              <BellRing className="w-4 h-4" /> Llamar Asistente
+            </button>
+          )}
         </div>
       </div>
 

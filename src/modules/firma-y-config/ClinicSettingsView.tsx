@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
-import { Building2, Clock, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
+import { Building2, Calendar, Clock, Plus, Save, Shield, Trash2, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { ASSISTANT_GRANTABLE_VIEWS, AssistantAssignment, AssistantPermissions } from '../../types/medical';
+import {
+  CalendarSlotInterval,
+  loadAgendaPrefs,
+  saveAgendaPrefs,
+  WORKING_DAY_OPTIONS,
+} from '../../utils/agendaPrefs';
 
 export const ClinicSettingsView: React.FC = () => {
+  const { currentUser } = useAuth();
   const {
     tenantConfig,
     updateTenantConfig,
@@ -16,9 +24,26 @@ export const ClinicSettingsView: React.FC = () => {
   } = useClinical();
   const { showToast } = useNotifications();
 
+  const initialAgenda = loadAgendaPrefs(currentUser?.id);
+  const [slotInterval, setSlotInterval] = useState<CalendarSlotInterval>(initialAgenda.slotInterval);
+  const [workingDays, setWorkingDays] = useState<number[]>(initialAgenda.workingDays);
   const [form, setForm] = useState(tenantConfig);
   const [newAssistantName, setNewAssistantName] = useState('');
   const [newAssistantEmail, setNewAssistantEmail] = useState('');
+
+  const handleUpdateAgenda = (nextInterval: CalendarSlotInterval, nextDays: number[]) => {
+    setSlotInterval(nextInterval);
+    setWorkingDays(nextDays);
+    saveAgendaPrefs(currentUser?.id, { slotInterval: nextInterval, workingDays: nextDays });
+    showToast('Configuración de agenda guardada.');
+  };
+
+  const toggleWorkingDay = (day: number) => {
+    const exists = workingDays.includes(day);
+    if (exists && workingDays.length === 1) return;
+    const nextDays = exists ? workingDays.filter((d) => d !== day) : [...workingDays, day];
+    handleUpdateAgenda(slotInterval, nextDays);
+  };
 
   const handleSaveTenant = (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,10 +98,73 @@ export const ClinicSettingsView: React.FC = () => {
           <Building2 className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Configuración de Clínica y Equipo</h1>
+          <h1 className="text-xl font-bold text-slate-900">Configuración de Agenda y Clínica</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Datos del consultorio pediátrico, horarios de atención y permisos de asistentes.
+            Bloques de citas, días laborables, datos del consultorio pediátrico y equipo.
           </p>
+        </div>
+      </div>
+
+      {/* Configuración de Agenda */}
+      <div className="bg-white rounded-2xl border border-sky-200 p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-[#0284C7]">
+            <Calendar className="w-4 h-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-slate-900">Configuración de Agenda</h2>
+            <p className="text-[11px] text-slate-500">
+              Define la duración por bloque de consulta y los días que atiende el doctor.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-bold text-slate-500 uppercase">
+              Duración por bloque
+            </span>
+            <div className="inline-flex rounded-xl bg-slate-100 p-1 gap-1">
+              {([15, 30, 45, 60] as CalendarSlotInterval[]).map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => handleUpdateAgenda(mins, workingDays)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
+                    slotInterval === mins
+                      ? 'bg-[#0284C7] text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {mins === 60 ? '1 hora' : `${mins} min`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-bold text-slate-500 uppercase">
+              Días que trabaja el doctor
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {WORKING_DAY_OPTIONS.map((opt) => {
+                const active = workingDays.includes(opt.day);
+                return (
+                  <button
+                    key={opt.day}
+                    type="button"
+                    onClick={() => toggleWorkingDay(opt.day)}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                      active
+                        ? 'bg-sky-50 border-sky-300 text-sky-900'
+                        : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

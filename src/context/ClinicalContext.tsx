@@ -75,6 +75,7 @@ interface ClinicalContextValue {
 
   // Operaciones clínicas
   addPatient: (newPatient: Omit<Patient, 'id' | 'historyNumber'>) => Patient;
+  updatePatient: (patientId: string, updated: Omit<Patient, 'id' | 'historyNumber'>) => void;
   addAppointment: (apt: Omit<Appointment, 'id' | 'waitingMinutes'>) => void;
   updateAppointmentStage: (appointmentId: string, stage: WaitingRoomStage) => void;
   rescheduleAppointment: (
@@ -422,6 +423,20 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     clinicalSync.createPatient(newPatientData).catch(() => {});
     showToast(`Expediente ${created.historyNumber} creado exitosamente`);
     return created;
+  };
+
+  const updatePatient = (
+    patientId: string,
+    updatedData: Omit<Patient, 'id' | 'historyNumber'>
+  ) => {
+    setPatients((prev) =>
+      prev.map((p) => (p.id === patientId ? { ...p, ...updatedData, id: p.id, historyNumber: p.historyNumber } : p))
+    );
+    patientsRef.current = patientsRef.current.map((p) =>
+      p.id === patientId ? { ...p, ...updatedData, id: p.id, historyNumber: p.historyNumber } : p
+    );
+    clinicalSync.updatePatient(patientId, updatedData).catch(() => {});
+    showToast('Información del paciente actualizada');
   };
 
   const addAppointment = (apt: Omit<Appointment, 'id' | 'waitingMinutes'>) => {
@@ -1315,6 +1330,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         navigateToPatientVaccines,
         navigateToActiveConsultation,
         addPatient,
+        updatePatient,
         addAppointment,
         updateAppointmentStage,
         rescheduleAppointment,

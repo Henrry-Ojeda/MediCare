@@ -7,75 +7,106 @@ import { calculateExactAgeLabel } from '../../../utils/pediatricCalculations';
 export interface PatientFormProps {
   compact?: boolean;
   showPerinatalSection?: boolean;
+  initialPatient?: Patient;
   onCancel?: () => void;
   onCreated?: (patient: Patient, action: 'history' | 'consultation') => void;
+  onUpdated?: (patient: Patient) => void;
 }
 
 export const PatientForm: React.FC<PatientFormProps> = ({
   compact = false,
   showPerinatalSection = true,
+  initialPatient,
   onCancel,
   onCreated,
+  onUpdated,
 }) => {
-  const { addPatient, navigateToPatient360, navigateToActiveConsultation } = useClinical();
+  const { addPatient, updatePatient, navigateToPatient360, navigateToActiveConsultation } = useClinical();
+  const isEditing = Boolean(initialPatient);
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [sex, setSex] = useState<'M' | 'F'>('M');
-  const [birthDate, setBirthDate] = useState('2022-01-01');
-  const [idDocument, setIdDocument] = useState('');
+  const [firstName, setFirstName] = useState(initialPatient?.firstName ?? '');
+  const [lastName, setLastName] = useState(initialPatient?.lastName ?? '');
+  const [sex, setSex] = useState<'M' | 'F'>(initialPatient?.sex ?? 'M');
+  const [birthDate, setBirthDate] = useState(initialPatient?.birthDate ?? '2022-01-01');
+  const [idDocument, setIdDocument] = useState(initialPatient?.idDocument ?? '');
 
-  const [guardianName, setGuardianName] = useState('');
-  const [guardianRelation, setGuardianRelation] = useState<'Madre' | 'Padre' | 'Representante Legal'>('Madre');
-  const [guardianIdDocument, setGuardianIdDocument] = useState('');
-  const [guardianWhatsapp, setGuardianWhatsapp] = useState('');
-  const [guardianEmail, setGuardianEmail] = useState('');
+  const [guardianName, setGuardianName] = useState(initialPatient?.guardianName ?? '');
+  const [guardianRelation, setGuardianRelation] = useState<Patient['guardianRelation']>(
+    initialPatient?.guardianRelation ?? 'Madre'
+  );
+  const [guardianIdDocument, setGuardianIdDocument] = useState(initialPatient?.guardianIdDocument ?? '');
+  const [guardianWhatsapp, setGuardianWhatsapp] = useState(initialPatient?.guardianWhatsapp ?? '');
+  const [guardianEmail, setGuardianEmail] = useState(initialPatient?.guardianEmail ?? '');
 
   const [showOptional, setShowOptional] = useState(false);
-  const [bloodType, setBloodType] = useState<'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-'>('O+');
-  const [allergiesText, setAllergiesText] = useState('');
-  const [chronicText, setChronicText] = useState('');
-  const [gestationalWeeks, setGestationalWeeks] = useState(39);
-  const [birthWeightKg, setBirthWeightKg] = useState(3.2);
+  const [bloodType, setBloodType] = useState<'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-'>(
+    initialPatient?.bloodType ?? 'O+'
+  );
+  const [allergiesText, setAllergiesText] = useState(
+    initialPatient?.criticalAllergies?.join(', ') ?? ''
+  );
+  const [chronicText, setChronicText] = useState(
+    initialPatient?.chronicConditions?.join(', ') ?? ''
+  );
+  const [gestationalWeeks, setGestationalWeeks] = useState(
+    initialPatient?.perinatal?.gestationalWeeks ?? 39
+  );
+  const [birthWeightKg, setBirthWeightKg] = useState(
+    initialPatient?.perinatal?.birthWeightKg ?? 3.2
+  );
 
   const createFromForm = (action: 'history' | 'consultation') => {
     if (!firstName.trim()) return;
     const cleanFirst = firstName.trim();
     const cleanLast = lastName.trim() || 'Paciente';
-    const created = addPatient({
+    const payload = {
       firstName: cleanFirst,
       lastName: cleanLast,
       sex,
       birthDate: birthDate || '2022-01-01',
       idDocument: idDocument.trim() || undefined,
       bloodType,
-      primarySpecialty: 'Pediatría',
-      criticalAllergies: allergiesText.trim() ? [allergiesText.trim()] : [],
-      chronicConditions: chronicText.trim() ? [chronicText.trim()] : [],
-      previousHospitalizations: 'Sin hospitalizaciones previas',
+      primarySpecialty: initialPatient?.primarySpecialty || ('Pediatría' as const),
+      criticalAllergies: allergiesText.trim()
+        ? allergiesText.split(',').map((s) => s.trim()).filter(Boolean)
+        : [],
+      chronicConditions: chronicText.trim()
+        ? chronicText.split(',').map((s) => s.trim()).filter(Boolean)
+        : [],
+      previousHospitalizations: initialPatient?.previousHospitalizations || 'Sin hospitalizaciones previas',
       guardianName: guardianName.trim() || `${cleanFirst} ${cleanLast}`.trim(),
       guardianRelation,
       guardianIdDocument: guardianIdDocument.trim() || idDocument.trim(),
-      guardianOccupation: '',
+      guardianOccupation: initialPatient?.guardianOccupation || '',
       guardianWhatsapp: guardianWhatsapp.trim(),
       guardianEmail: guardianEmail.trim(),
       perinatal: {
+        ...(initialPatient?.perinatal ?? {
+          apgar1Min: 9,
+          apgar5Min: 10,
+          birthHeightCm: 50,
+          birthHeadCircumferenceCm: 34.5,
+          deliveryType: 'Parto Eutócico Simple',
+          neonatalComplications: 'Ninguna',
+          maternalBloodType: bloodType,
+          exclusiveBreastfeedingMonths: 6,
+        }),
         gestationalWeeks,
-        apgar1Min: 9,
-        apgar5Min: 10,
         birthWeightKg,
-        birthHeightCm: 50,
-        birthHeadCircumferenceCm: 34.5,
-        deliveryType: 'Parto Eutócico Simple',
-        neonatalComplications: 'Ninguna',
-        maternalBloodType: bloodType,
-        exclusiveBreastfeedingMonths: 6,
       },
-      growthHistory: [],
-      vaccines: [],
-      studies: [],
-      consultations: [],
-    });
+      growthHistory: initialPatient?.growthHistory ?? [],
+      vaccines: initialPatient?.vaccines ?? [],
+      studies: initialPatient?.studies ?? [],
+      consultations: initialPatient?.consultations ?? [],
+    };
+
+    if (initialPatient) {
+      updatePatient(initialPatient.id, payload);
+      onUpdated?.({ ...initialPatient, ...payload });
+      return;
+    }
+
+    const created = addPatient(payload);
 
     if (onCreated) {
       onCreated(created, action);
@@ -337,7 +368,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
             Cancelar
           </button>
         )}
-        {!compact && (
+        {!compact && !isEditing && (
           <button
             type="submit"
             className="px-4 py-2.5 rounded-xl border border-[#0284C7] text-[#0284C7] hover:bg-sky-50 text-xs font-bold cursor-pointer inline-flex items-center gap-1.5"
@@ -352,7 +383,7 @@ export const PatientForm: React.FC<PatientFormProps> = ({
           className="px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5"
         >
           <Stethoscope className="w-3.5 h-3.5" />
-          <span>Guardar e Iniciar Consulta</span>
+          <span>{isEditing ? 'Guardar Cambios' : 'Guardar e Iniciar Consulta'}</span>
         </button>
       </div>
     </form>

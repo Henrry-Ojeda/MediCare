@@ -73,6 +73,9 @@ const UserProfileView = lazy(() =>
 const RecipeTemplateDesignerView = lazy(() =>
   import('./modules/firma-y-config').then((m) => ({ default: m.RecipeTemplateDesignerView }))
 );
+const AiModuleConfigView = lazy(() =>
+  import('./modules/firma-y-config').then((m) => ({ default: m.AiModuleConfigView }))
+);
 const CashbookView = lazy(() =>
   import('./modules/finanzas').then((m) => ({ default: m.CashbookView }))
 );
@@ -163,6 +166,8 @@ const AuthenticatedRouter: React.FC = () => {
         return <ClinicSettingsView />;
       case 'plantillas':
         return <RecipeTemplateDesignerView />;
+      case 'ia-modulo':
+        return <AiModuleConfigView />;
       case 'caja':
         return <CashbookView />;
       case 'caja-recibos':

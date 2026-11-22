@@ -1,0 +1,7 @@
+{
+  "version": "1.1.0",
+  "buildNumber": 2,
+  "apkUrl": "https://medi-care-ebon.vercel.app/downloads/MediCare.apk",
+  "downloadPageUrl": "https://medi-care-ebon.vercel.app/descargar",
+  "notes": "Dashboard Clínico Pediátrico, Historiales 360°, SafeArea en modales, Configuración de Agenda y Récipe."
+}
