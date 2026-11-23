@@ -32,10 +32,19 @@ export const PediatricConsultationView: React.FC = () => {
     addPatientStudy,
     openDispatchModal,
     incrementWhatsappSent,
+    doctors,
+    refreshPatient360,
     navigateToPatientVaccines,
   } = useClinical();
   const { currentUser, userRole, doctorSignature } = useAuth();
   const { showToast } = useNotifications();
+
+  const canUseDictation =
+    userRole === 'ADMIN' ||
+    Boolean(
+      currentUser?.dictationEnabled ||
+        doctors.find((d) => d.id === currentUser?.id)?.dictationEnabled
+    );
 
   const [patientSearch, setPatientSearch] = useState('');
   const [isQuickPatientOpen, setIsQuickPatientOpen] = useState(false);
@@ -60,6 +69,12 @@ export const PediatricConsultationView: React.FC = () => {
       recordedBy: currentUser?.name || 'Pediatra',
     }
   );
+
+  useEffect(() => {
+    if (activePatient?.id) {
+      void refreshPatient360(activePatient.id);
+    }
+  }, [activePatient?.id]);
 
   useEffect(() => {
     if (activePatient?.latestVitals) {
@@ -409,12 +424,14 @@ export const PediatricConsultationView: React.FC = () => {
         onOpenVaccines={() => navigateToPatientVaccines(activePatient.id)}
       />
 
-      <ClinicalDictationBar
-        patientName={`${activePatient.firstName} ${activePatient.lastName}`}
-        patientAge={ageLabel}
-        weightKg={vitals.weightKg}
-        onApplyAiResult={handleApplyAiResult}
-      />
+      {canUseDictation && (
+        <ClinicalDictationBar
+          patientName={`${activePatient.firstName} ${activePatient.lastName}`}
+          patientAge={ageLabel}
+          weightKg={vitals.weightKg}
+          onApplyAiResult={handleApplyAiResult}
+        />
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">

@@ -1,6 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Dapper;
+using MediCare.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,11 +16,13 @@ public sealed class AiCopilotController : ControllerBase
 {
     private readonly IConfiguration _config;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly DbConnectionFactory _db;
 
-    public AiCopilotController(IConfiguration config, IHttpClientFactory httpClientFactory)
+    public AiCopilotController(IConfiguration config, IHttpClientFactory httpClientFactory, DbConnectionFactory db)
     {
         _config = config;
         _httpClientFactory = httpClientFactory;
+        _db = db;
     }
 
     public sealed record ProcessConsultationRequest(
@@ -91,6 +96,31 @@ public sealed class AiCopilotController : ControllerBase
     [HttpPost("process-consultation")]
     public async Task<IActionResult> ProcessConsultation([FromBody] ProcessConsultationRequest req, CancellationToken ct)
     {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        var isAdmin = role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("SUPERADMIN", StringComparison.OrdinalIgnoreCase);
+        if (!isAdmin && Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+        {
+            await using var conn = await _db.CreateOpenConnectionAsync(ct);
+            var enabled = await conn.QueryFirstOrDefaultAsync<bool?>(
+                """
+                IF COL_LENGTH('dbo.TB_USUARIOS', 'DictationEnabled') IS NOT NULL
+                    SELECT ISNULL(DictationEnabled, 0) FROM dbo.TB_USUARIOS WHERE Id = @Id
+                ELSE
+                    SELECT CAST(0 AS BIT)
+                """,
+                new { Id = uid }
+            );
+            if (enabled != true)
+            {
+                return StatusCode(403, new
+                {
+                    error = "DICTATION_NOT_ENABLED",
+                    message = "El Dictado Clínico Inteligente no está habilitado en el plan de este médico."
+                });
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(req.Transcript))
             return BadRequest(new { error = "Se requiere la transcripción o dictado clínico." });
 

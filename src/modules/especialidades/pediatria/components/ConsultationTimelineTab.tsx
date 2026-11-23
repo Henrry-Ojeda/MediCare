@@ -25,6 +25,13 @@ interface ConsultationTimelineTabProps {
   doctors: DoctorProfile[];
   diagnosisPermissions: DiagnosisPermissionRecord[];
   onGrantDiagnosisPermission?: (targetDoctorId: string, consultationId: string) => void;
+  onRequestDiagnosisPermission?: (
+    consultationId: string,
+    authorDoctorId?: string,
+    reason?: string
+  ) => void;
+  onApproveDiagnosisPermission?: (permissionId: string) => void;
+  onRejectDiagnosisPermission?: (permissionId: string) => void;
   onRevokeDiagnosisPermission?: (permissionId: string) => void;
   onOpenRecipe?: (consultation: PastConsultationSummary) => void;
 }
@@ -38,10 +45,14 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
   doctors,
   diagnosisPermissions,
   onGrantDiagnosisPermission,
+  onRequestDiagnosisPermission,
+  onApproveDiagnosisPermission,
+  onRejectDiagnosisPermission,
   onRevokeDiagnosisPermission,
   onOpenRecipe,
 }) => {
   const [selectedDoctorByCons, setSelectedDoctorByCons] = useState<Record<string, string>>({});
+  const [requestReasonByCons, setRequestReasonByCons] = useState<Record<string, string>>({});
 
   if (consultations.length === 0) {
     return (
@@ -62,8 +73,22 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
         const activeGrantsForThisCons = diagnosisPermissions.filter(
           (p) =>
             p.active &&
+            (!p.status || p.status === 'APPROVED') &&
             p.patientId === patientId &&
             (!p.consultationId || p.consultationId === c.id)
+        );
+
+        const pendingRequestsForThisCons = diagnosisPermissions.filter(
+          (p) =>
+            p.status === 'PENDING' &&
+            p.patientId === patientId &&
+            (!p.consultationId || p.consultationId === c.id)
+        );
+
+        const myPendingRequest = pendingRequestsForThisCons.find(
+          (p) =>
+            (Boolean(currentUserId) && p.targetDoctorUserId === currentUserId) ||
+            p.targetDoctorName.trim().toLowerCase() === (currentUserName || '').trim().toLowerCase()
         );
 
         const hasAuthorizedPermission =
@@ -154,11 +179,21 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
                         {c.physicalExamSummary}
                       </p>
                     )}
+                    {c.parentGuide && (
+                      <p className="text-[11px] text-sky-800 bg-sky-50/70 rounded-lg px-2 py-1.5 leading-relaxed border border-sky-100">
+                        <span className="font-bold">Guía y Cuidados:</span> {c.parentGuide}
+                      </p>
+                    )}
+                    {c.alarmSigns && c.alarmSigns.length > 0 && (
+                      <p className="text-[11px] text-rose-800 bg-rose-50/70 rounded-lg px-2 py-1.5 leading-relaxed border border-rose-100">
+                        <span className="font-bold">Signos de Alarma:</span> {c.alarmSigns.join(' · ')}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="text-amber-700 leading-relaxed flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 shrink-0" />
-                    Diagnóstico y notas clínicas privadas del médico tratante. Triaje visible arriba.
+                    Anamnesis, examen físico, diagnóstico CIE-10, guía de cuidados y signos de alarma privados del médico tratante. Triaje visible arriba.
                   </p>
                 )}
               </div>
@@ -181,6 +216,87 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
                 )}
               </div>
             </div>
+
+            {!canSeeDiagnosis && userRole === 'PEDIATRA' && onRequestDiagnosisPermission && (
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                {myPendingRequest ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
+                    <Lock className="w-3.5 h-3.5" />
+                    Solicitud de acceso enviada · Pendiente de aprobación por {c.doctorName}
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2 w-full">
+                    <input
+                      type="text"
+                      value={requestReasonByCons[c.id] || ''}
+                      onChange={(e) =>
+                        setRequestReasonByCons((prev) => ({ ...prev, [c.id]: e.target.value }))
+                      }
+                      placeholder="Motivo opcional (ej. Interconsulta / seguimiento)"
+                      className="flex-1 min-w-[200px] px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onRequestDiagnosisPermission(
+                          c.id,
+                          c.doctorId,
+                          requestReasonByCons[c.id]?.trim() || undefined
+                        );
+                        setRequestReasonByCons((prev) => ({ ...prev, [c.id]: '' }));
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Solicitar permiso de diagnóstico
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isOwnConsultation && pendingRequestsForThisCons.length > 0 && (
+              <div className="pt-2 border-t border-amber-100 bg-amber-50/60 rounded-xl p-3 space-y-2 text-xs">
+                <p className="font-bold text-amber-900">
+                  Solicitudes pendientes para ver este diagnóstico:
+                </p>
+                <div className="space-y-1.5">
+                  {pendingRequestsForThisCons.map((req) => (
+                    <div
+                      key={req.id}
+                      className="flex flex-wrap items-center justify-between gap-2 bg-white border border-amber-200 rounded-lg px-3 py-2"
+                    >
+                      <div>
+                        <span className="font-bold text-slate-800">{req.targetDoctorName}</span>
+                        {req.reason && (
+                          <span className="text-slate-500 ml-2">— {req.reason}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {onApproveDiagnosisPermission && (
+                          <button
+                            type="button"
+                            onClick={() => onApproveDiagnosisPermission(req.id)}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
+                          >
+                            Aprobar
+                          </button>
+                        )}
+                        {onRejectDiagnosisPermission && (
+                          <button
+                            type="button"
+                            onClick={() => onRejectDiagnosisPermission(req.id)}
+                            className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold cursor-pointer"
+                          >
+                            Rechazar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {isOwnConsultation && onGrantDiagnosisPermission && (
               <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">

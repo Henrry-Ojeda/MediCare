@@ -214,8 +214,8 @@ public sealed class PatientsController : ControllerBase
                 Cie10Name = hasAccess ? (string)c.Cie10Name : "Diagnóstico protegido (solo el médico autor o con permiso explícito)",
                 PhysicalExamSummary = hasAccess ? (string)c.PhysicalExamSummary : null,
                 SpecialtyExamJson = hasAccess ? (string?)c.SpecialtyExamJson : null,
-                PatientGuide = (string?)c.PatientGuide,
-                AlarmSignsJson = (string)c.AlarmSignsJson,
+                PatientGuide = hasAccess ? (string?)c.PatientGuide : null,
+                AlarmSignsJson = hasAccess ? (string)c.AlarmSignsJson : "[]",
                 Prescriptions = rxList ?? [],
                 RecipeTemplate = docTemplate,
             };
