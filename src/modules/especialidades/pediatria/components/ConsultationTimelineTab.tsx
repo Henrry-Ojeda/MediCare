@@ -74,7 +74,10 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
               p.targetDoctorName.trim().toLowerCase() === (currentUserName || '').trim().toLowerCase()
           );
 
-        const canSeeDiagnosis = isOwnConsultation || hasAuthorizedPermission;
+        const canSeeDiagnosis =
+          typeof c.hasDiagnosisAccess === 'boolean'
+            ? c.hasDiagnosisAccess
+            : isOwnConsultation || hasAuthorizedPermission;
 
         const otherDoctors = doctors.filter(
           (d) =>
@@ -127,7 +130,7 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
                 </p>
               </div>
 
-              {onOpenRecipe && canSeeDiagnosis && (
+              {onOpenRecipe && (
                 <button
                   type="button"
                   onClick={() => onOpenRecipe(c)}
@@ -143,10 +146,19 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
                 <p className="font-bold text-slate-700 flex items-center gap-1">
                   <FileText className="w-3.5 h-3.5 text-slate-400" /> Motivo, Triaje y Examen Físico
                 </p>
-                <p className="text-slate-600 leading-relaxed">{c.reason}</p>
-                {c.physicalExamSummary && (
-                  <p className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-200/70 pt-1.5">
-                    {c.physicalExamSummary}
+                {canSeeDiagnosis ? (
+                  <>
+                    <p className="text-slate-600 leading-relaxed">{c.reason}</p>
+                    {c.physicalExamSummary && (
+                      <p className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-200/70 pt-1.5">
+                        {c.physicalExamSummary}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-amber-700 leading-relaxed flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    Diagnóstico y notas clínicas privadas del médico tratante. Triaje visible arriba.
                   </p>
                 )}
               </div>
