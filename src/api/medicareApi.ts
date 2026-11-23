@@ -526,6 +526,7 @@ export const medicareApi = {
         targetDoctorName: string;
         reason?: string;
         active: boolean;
+        status?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'REVOKED';
         createdAt: string;
       }>
     >(patientId ? `/diagnosis-permissions?patientId=${encodeURIComponent(patientId)}` : '/diagnosis-permissions'),
@@ -536,9 +537,30 @@ export const medicareApi = {
     targetDoctorUserId: string;
     reason?: string;
   }) =>
-    apiFetch<{ id: string }>('/diagnosis-permissions', {
+    apiFetch<{ id: string; status?: string }>('/diagnosis-permissions', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  requestDoctorDiagnosisPermission: (payload: {
+    patientId: string;
+    consultationId?: string;
+    authorDoctorUserId?: string;
+    reason?: string;
+  }) =>
+    apiFetch<{ id: string; status: string; alreadyExists?: boolean }>('/diagnosis-permissions/request', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  approveDoctorDiagnosisPermission: (id: string) =>
+    apiFetch<{ ok: boolean; status: string }>(`/diagnosis-permissions/${id}/approve`, {
+      method: 'POST',
+    }),
+
+  rejectDoctorDiagnosisPermission: (id: string) =>
+    apiFetch<{ ok: boolean; status: string }>(`/diagnosis-permissions/${id}/reject`, {
+      method: 'POST',
     }),
 
   revokeDoctorDiagnosisPermission: (id: string) =>

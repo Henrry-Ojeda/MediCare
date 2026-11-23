@@ -163,6 +163,7 @@ export interface DiagnosisPermissionRecord {
   targetDoctorName: string;
   reason?: string;
   active: boolean;
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'REVOKED';
   createdAt: string;
 }
 
