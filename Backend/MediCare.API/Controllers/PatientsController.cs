@@ -390,5 +390,75 @@ public sealed class PatientsController : ControllerBase
             throw;
         }
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreatePatientRequest req, CancellationToken ct)
+    {
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            var updated = await conn.QueryFirstOrDefaultAsync(
+                """
+                UPDATE dbo.TB_PACIENTES
+                SET FirstName = @FirstName,
+                    LastName = @LastName,
+                    Sex = @Sex,
+                    BirthDate = @BirthDate,
+                    IdDocument = @IdDocument,
+                    BloodType = @BloodType,
+                    CriticalAllergiesJson = @CriticalAllergiesJson,
+                    ChronicConditionsJson = @ChronicConditionsJson,
+                    PreviousHospitalizations = @PreviousHospitalizations,
+                    GuardianName = @GuardianName,
+                    GuardianRelation = @GuardianRelation,
+                    GuardianIdDocument = @GuardianIdDocument,
+                    GuardianOccupation = @GuardianOccupation,
+                    GuardianWhatsapp = @GuardianWhatsapp,
+                    GuardianEmail = @GuardianEmail
+                OUTPUT INSERTED.*
+                WHERE Id = @Id
+                """,
+                new
+                {
+                    Id = id,
+                    req.FirstName,
+                    req.LastName,
+                    req.Sex,
+                    req.BirthDate,
+                    req.IdDocument,
+                    req.BloodType,
+                    CriticalAllergiesJson = JsonSerializer.Serialize(req.CriticalAllergies ?? []),
+                    ChronicConditionsJson = JsonSerializer.Serialize(req.ChronicConditions ?? []),
+                    req.PreviousHospitalizations,
+                    req.GuardianName,
+                    req.GuardianRelation,
+                    req.GuardianIdDocument,
+                    req.GuardianOccupation,
+                    req.GuardianWhatsapp,
+                    req.GuardianEmail
+                },
+                transaction: tx
+            );
+
+            if (updated is null)
+                return NotFound(new { message = "Paciente no encontrado." });
+
+            await _audit.RecordAsync(
+                conn, tx, HttpContext, "Actualización de Expediente",
+                "TB_PACIENTES", id.ToString(), id,
+                newValue: new { req.FirstName, req.LastName, req.GuardianWhatsapp }
+            );
+
+            await tx.CommitAsync(ct);
+            return Ok(updated);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
 }
 
