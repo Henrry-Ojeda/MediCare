@@ -179,11 +179,21 @@ export const ConsultationTimelineTab: React.FC<ConsultationTimelineTabProps> = (
                         {c.physicalExamSummary}
                       </p>
                     )}
+                    {c.parentGuide && (
+                      <p className="text-[11px] text-sky-800 bg-sky-50/70 rounded-lg px-2 py-1.5 leading-relaxed border border-sky-100">
+                        <span className="font-bold">Guía y Cuidados:</span> {c.parentGuide}
+                      </p>
+                    )}
+                    {c.alarmSigns && c.alarmSigns.length > 0 && (
+                      <p className="text-[11px] text-rose-800 bg-rose-50/70 rounded-lg px-2 py-1.5 leading-relaxed border border-rose-100">
+                        <span className="font-bold">Signos de Alarma:</span> {c.alarmSigns.join(' · ')}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <p className="text-amber-700 leading-relaxed flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 shrink-0" />
-                    Diagnóstico y notas clínicas privadas del médico tratante. Triaje visible arriba.
+                    Anamnesis, examen físico, diagnóstico CIE-10, guía de cuidados y signos de alarma privados del médico tratante. Triaje visible arriba.
                   </p>
                 )}
               </div>
