@@ -174,6 +174,14 @@ interface ClinicalContextValue {
     consultationId?: string,
     reason?: string
   ) => Promise<void>;
+  requestDiagnosisPermission: (
+    patientId: string,
+    consultationId?: string,
+    authorDoctorId?: string,
+    reason?: string
+  ) => Promise<void>;
+  approveDiagnosisPermission: (permissionId: string, patientId?: string) => Promise<void>;
+  rejectDiagnosisPermission: (permissionId: string) => Promise<void>;
   revokeDiagnosisPermission: (permissionId: string) => Promise<void>;
 }
 
@@ -299,6 +307,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 avatarUrl: d.avatarUrl || undefined,
                 specialty: 'Pediatría',
                 licenseNumber: d.numeroColegiado || 'MPPS Pendiente',
+                dictationEnabled: Boolean(d.dictationEnabled),
               };
             })
           );
@@ -1070,6 +1079,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           phone: doctor.phone,
           licenseNumber: doctor.licenseNumber,
           avatarUrl: doctor.avatarUrl,
+          dictationEnabled: Boolean(doctor.dictationEnabled),
         });
         const created: DoctorProfile = {
           ...doctor,
@@ -1079,6 +1089,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: res.email,
           licenseNumber: res.numeroColegiado,
           avatarUrl: res.avatarUrl,
+          dictationEnabled: Boolean(res.dictationEnabled ?? doctor.dictationEnabled),
         };
         setDoctors((prev) => [...prev, created]);
         showToast(`Perfil de Doctor ${created.name} creado en base de datos`);
@@ -1109,6 +1120,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           phone: updated.phone,
           licenseNumber: updated.licenseNumber,
           avatarUrl: updated.avatarUrl,
+          dictationEnabled: Boolean(updated.dictationEnabled),
         });
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Error al actualizar el médico.');
@@ -1349,6 +1361,87 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     showToast(`Permiso de diagnóstico concedido a ${localRecord.targetDoctorName}`);
   };
 
+  const requestDiagnosisPermission = async (
+    patientId: string,
+    consultationId?: string,
+    authorDoctorId?: string,
+    reason?: string
+  ) => {
+    const authorDoc = doctors.find((d) => d.id === authorDoctorId);
+    const localRecord: DiagnosisPermissionRecord = {
+      id: `dreq-${Date.now()}`,
+      patientId,
+      consultationId: consultationId || null,
+      grantedByUserId: authorDoctorId || '',
+      grantedByName: authorDoc?.name || 'Médico tratante',
+      targetDoctorUserId: currentUser?.id || '',
+      targetDoctorName: currentUser?.name || 'Médico',
+      reason: reason || 'Solicitud de acceso al diagnóstico clínico para continuidad asistencial',
+      active: false,
+      status: 'PENDING',
+      createdAt: getTodayIsoDate(),
+    };
+
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (getAuthToken() && guidRegex.test(patientId)) {
+      try {
+        const res = await medicareApi.requestDoctorDiagnosisPermission({
+          patientId,
+          consultationId: consultationId && guidRegex.test(consultationId) ? consultationId : undefined,
+          authorDoctorUserId: authorDoctorId && guidRegex.test(authorDoctorId) ? authorDoctorId : undefined,
+          reason,
+        });
+        localRecord.id = res.id;
+        if (res.status === 'APPROVED') {
+          localRecord.active = true;
+          localRecord.status = 'APPROVED';
+        }
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Error al solicitar permiso de diagnóstico.');
+        return;
+      }
+    }
+
+    setDiagnosisPermissions((prev) => {
+      if (prev.some((p) => p.id === localRecord.id)) return prev;
+      return [localRecord, ...prev];
+    });
+    showToast('Solicitud de permiso de diagnóstico enviada al médico tratante');
+  };
+
+  const approveDiagnosisPermission = async (permissionId: string, patientId?: string) => {
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (getAuthToken() && guidRegex.test(permissionId)) {
+      try {
+        await medicareApi.approveDoctorDiagnosisPermission(permissionId);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Error al aprobar solicitud.');
+        return;
+      }
+    }
+    setDiagnosisPermissions((prev) =>
+      prev.map((p) => (p.id === permissionId ? { ...p, active: true, status: 'APPROVED' } : p))
+    );
+    if (patientId) {
+      void refreshPatient360(patientId);
+    }
+    showToast('Solicitud de diagnóstico aprobada');
+  };
+
+  const rejectDiagnosisPermission = async (permissionId: string) => {
+    const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (getAuthToken() && guidRegex.test(permissionId)) {
+      try {
+        await medicareApi.rejectDoctorDiagnosisPermission(permissionId);
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Error al rechazar solicitud.');
+        return;
+      }
+    }
+    setDiagnosisPermissions((prev) => prev.filter((p) => p.id !== permissionId));
+    showToast('Solicitud de diagnóstico rechazada');
+  };
+
   const revokeDiagnosisPermission = async (permissionId: string) => {
     const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (getAuthToken() && guidRegex.test(permissionId)) {
@@ -1446,6 +1539,9 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         saveClinic,
         removeClinic,
         grantDiagnosisPermission,
+        requestDiagnosisPermission,
+        approveDiagnosisPermission,
+        rejectDiagnosisPermission,
         revokeDiagnosisPermission,
       }}
     >

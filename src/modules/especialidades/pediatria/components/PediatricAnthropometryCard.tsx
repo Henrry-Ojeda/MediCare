@@ -184,28 +184,89 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
           </span>
         </div>
 
-        {trend.hasPrevious && (
-          <div
-            className={`rounded-xl px-3 py-2 text-xs flex items-start gap-2 border ${
-              trend.isNormalGrowth
-                ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                : 'bg-amber-50 border-amber-200 text-amber-900'
-            }`}
-          >
-            {trend.isNormalGrowth ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            ) : (
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        {previousGrowth ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
+            <p className="text-xs font-bold text-slate-800">
+              Análisis Comparativo: Actual vs. Historial Anterior vs. Estándar OMS
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+              <div className="rounded-xl bg-white border border-sky-200 p-3 space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-sky-700">
+                  1. Información Actual
+                </p>
+                <p className="text-slate-700">
+                  Peso: <strong>{vitals.weightKg} kg</strong> ({(vitals.weightKg - previousGrowth.weightKg) >= 0 ? '+' : ''}
+                  {(vitals.weightKg - previousGrowth.weightKg).toFixed(2)} kg)
+                </p>
+                <p className="text-slate-700">
+                  Talla: <strong>{vitals.heightCm} cm</strong> ({(vitals.heightCm - previousGrowth.heightCm) >= 0 ? '+' : ''}
+                  {(vitals.heightCm - previousGrowth.heightCm).toFixed(1)} cm)
+                </p>
+                <p className="text-slate-700">
+                  IMC: <strong>{bmi} kg/m²</strong>
+                  {vitals.headCircumferenceCm ? ` · PC: ${vitals.headCircumferenceCm} cm` : ''}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white border border-slate-200 p-3 space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                  2. Registro Anterior ({previousGrowth.date})
+                </p>
+                <p className="text-slate-700">
+                  Peso: <strong>{previousGrowth.weightKg} kg</strong> ({previousGrowth.ageMonths} m)
+                </p>
+                <p className="text-slate-700">
+                  Talla: <strong>{previousGrowth.heightCm} cm</strong>
+                </p>
+                <p className="text-slate-700">
+                  IMC: <strong>{previousGrowth.bmi} kg/m²</strong>
+                  {previousGrowth.headCircumferenceCm ? ` · PC: ${previousGrowth.headCircumferenceCm} cm` : ''}
+                </p>
+              </div>
+
+              <div
+                className={`rounded-xl p-3 space-y-1 border ${
+                  trend.isNormalGrowth
+                    ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                    : 'bg-amber-50 border-amber-200 text-amber-950'
+                }`}
+              >
+                <p className="text-[11px] font-bold uppercase tracking-wide flex items-center gap-1">
+                  {trend.isNormalGrowth ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  )}
+                  3. Evaluación OMS
+                </p>
+                <p className="font-bold">{oms.statusLabel}</p>
+                <p className="text-[11px]">
+                  Peso {oms.weightPercentile} · Talla {oms.heightPercentile}
+                  {oms.headStatusLabel ? ` · ${oms.headStatusLabel}` : ''}
+                </p>
+                <p className="text-[11px] font-semibold">{trend.summary}</p>
+              </div>
+            </div>
+
+            {trend.alerts.length > 0 && (
+              <ul className="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pt-1">
+                {trend.alerts.map((al) => (
+                  <li key={al}>{al}</li>
+                ))}
+              </ul>
             )}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-3.5 py-2.5 text-xs text-sky-950 flex items-start gap-2">
+            <Activity className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold">{trend.summary}</p>
-              {trend.alerts.length > 0 && (
-                <ul className="list-disc list-inside text-[11px] mt-0.5 space-y-0.5">
-                  {trend.alerts.map((al) => (
-                    <li key={al}>{al}</li>
-                  ))}
-                </ul>
-              )}
+              <p className="font-bold">Primera evaluación antropométrica (sin historial previo)</p>
+              <p className="text-[11px] text-sky-800">
+                Estándar OMS ({ageMonths} m · {sex === 'F' ? 'Niña' : 'Niño'}):{' '}
+                <strong>{oms.statusLabel}</strong> · Peso {oms.weightPercentile} · Talla{' '}
+                {oms.heightPercentile}
+                {oms.headStatusLabel ? ` · ${oms.headStatusLabel}` : ''}
+              </p>
             </div>
           </div>
         )}

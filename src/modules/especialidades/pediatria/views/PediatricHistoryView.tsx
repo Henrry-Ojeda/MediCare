@@ -35,6 +35,9 @@ export const PediatricHistoryView: React.FC = () => {
     addPatientStudy,
     completeConsultation,
     grantDiagnosisPermission,
+    requestDiagnosisPermission,
+    approveDiagnosisPermission,
+    rejectDiagnosisPermission,
     revokeDiagnosisPermission,
     refreshPatient360,
   } = useClinical();
@@ -254,6 +257,15 @@ export const PediatricHistoryView: React.FC = () => {
             diagnosisPermissions={diagnosisPermissions}
             onGrantDiagnosisPermission={(targetDoctorId, consultationId) =>
               grantDiagnosisPermission(selectedPatient.id, targetDoctorId, consultationId)
+            }
+            onRequestDiagnosisPermission={(consultationId, authorDoctorId, reason) =>
+              requestDiagnosisPermission(selectedPatient.id, consultationId, authorDoctorId, reason)
+            }
+            onApproveDiagnosisPermission={(permissionId) =>
+              approveDiagnosisPermission(permissionId, selectedPatient.id)
+            }
+            onRejectDiagnosisPermission={(permissionId) =>
+              rejectDiagnosisPermission(permissionId)
             }
             onRevokeDiagnosisPermission={(permissionId) => revokeDiagnosisPermission(permissionId)}
             onOpenRecipe={(consultation) => openDispatchModal(selectedPatient, consultation)}

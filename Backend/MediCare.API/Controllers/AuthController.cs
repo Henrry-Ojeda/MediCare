@@ -51,9 +51,17 @@ public sealed class AuthController : ControllerBase
             return BadRequest(new { message = "Usuario/correo y contraseña requeridos." });
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await conn.ExecuteAsync(
+            """
+            IF COL_LENGTH('dbo.TB_USUARIOS', 'DictationEnabled') IS NULL
+                ALTER TABLE dbo.TB_USUARIOS
+                    ADD DictationEnabled BIT NOT NULL CONSTRAINT DF_TB_USUARIOS_DICTATION DEFAULT 0;
+            """
+        );
         var user = await conn.QueryFirstOrDefaultAsync<dynamic>(
             """
             SELECT u.Id, u.Username, u.NombreCompleto, u.Email, u.PasswordHash, u.AvatarUrl, u.Activo,
+                   ISNULL(u.DictationEnabled, 0) AS DictationEnabled,
                    r.Codigo AS RoleCodigo, r.Nombre AS RoleNombre
             FROM dbo.TB_USUARIOS u
             INNER JOIN dbo.TB_ROLES r ON r.Id = u.RoleId
@@ -109,6 +117,7 @@ public sealed class AuthController : ControllerBase
                 roleCode,
                 roleName = (string)user.RoleNombre,
                 esSuperAdmin,
+                dictationEnabled = (bool)user.DictationEnabled,
             }
         });
     }

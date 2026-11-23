@@ -163,6 +163,7 @@ export interface DiagnosisPermissionRecord {
   targetDoctorName: string;
   reason?: string;
   active: boolean;
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED' | 'REVOKED';
   createdAt: string;
 }
 
@@ -307,6 +308,7 @@ export interface DoctorProfile {
   avatarUrl?: string;
   specialty: Specialty;
   licenseNumber: string;
+  dictationEnabled?: boolean;
 }
 
 export interface AssistantPermissions {
