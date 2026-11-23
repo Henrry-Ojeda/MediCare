@@ -28,8 +28,18 @@ public sealed class UsersController : ControllerBase
         string? Password,
         string? Phone,
         string? LicenseNumber,
-        string? AvatarUrl
+        string? AvatarUrl,
+        bool DictationEnabled = false
     );
+
+    private static Task EnsureDictationColumnAsync(System.Data.IDbConnection conn) =>
+        conn.ExecuteAsync(
+            """
+            IF COL_LENGTH('dbo.TB_USUARIOS', 'DictationEnabled') IS NULL
+                ALTER TABLE dbo.TB_USUARIOS
+                    ADD DictationEnabled BIT NOT NULL CONSTRAINT DF_TB_USUARIOS_DICTATION DEFAULT 0;
+            """
+        );
 
     public sealed record AssistantPermissionsDto(
         bool CanSchedule = true,
@@ -67,9 +77,11 @@ public sealed class UsersController : ControllerBase
     public async Task<IActionResult> ListDoctors(CancellationToken ct)
     {
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureDictationColumnAsync(conn);
         var rows = (await conn.QueryAsync<dynamic>(
             """
-            SELECT u.Id, u.NombreCompleto, u.Username, u.Email, u.Telefono, u.NumeroColegiado, u.AvatarUrl, u.Activo
+            SELECT u.Id, u.NombreCompleto, u.Username, u.Email, u.Telefono, u.NumeroColegiado, u.AvatarUrl, u.Activo,
+                   ISNULL(u.DictationEnabled, 0) AS DictationEnabled
             FROM dbo.TB_USUARIOS u
             INNER JOIN dbo.TB_ROLES r ON r.Id = u.RoleId
             WHERE r.Codigo = 'MEDICO' AND u.Activo = 1
@@ -85,6 +97,7 @@ public sealed class UsersController : ControllerBase
             numeroColegiado = (string?)u.NumeroColegiado ?? "MPPS Pendiente",
             avatarUrl = (string?)u.AvatarUrl,
             activo = (bool)u.Activo,
+            dictationEnabled = (bool)u.DictationEnabled,
         });
         return Ok(rows);
     }
@@ -108,6 +121,7 @@ public sealed class UsersController : ControllerBase
             : req.Username.Trim().ToLowerInvariant();
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureDictationColumnAsync(conn);
 
         var exists = await conn.QueryFirstOrDefaultAsync<int>(
             """
@@ -130,8 +144,8 @@ public sealed class UsersController : ControllerBase
 
         await conn.ExecuteAsync(
             """
-            INSERT INTO dbo.TB_USUARIOS (Id, RoleId, Username, NombreCompleto, Email, PasswordHash, NumeroColegiado, Telefono, AvatarUrl, Activo)
-            VALUES (@Id, @RoleId, @Username, @NombreCompleto, @Email, @PasswordHash, @NumeroColegiado, @Telefono, @AvatarUrl, 1)
+            INSERT INTO dbo.TB_USUARIOS (Id, RoleId, Username, NombreCompleto, Email, PasswordHash, NumeroColegiado, Telefono, AvatarUrl, DictationEnabled, Activo)
+            VALUES (@Id, @RoleId, @Username, @NombreCompleto, @Email, @PasswordHash, @NumeroColegiado, @Telefono, @AvatarUrl, @DictationEnabled, 1)
             """,
             new
             {
@@ -144,6 +158,7 @@ public sealed class UsersController : ControllerBase
                 NumeroColegiado = string.IsNullOrWhiteSpace(req.LicenseNumber) ? "MPPS Pendiente" : req.LicenseNumber.Trim(),
                 Telefono = string.IsNullOrWhiteSpace(req.Phone) ? null : req.Phone.Trim(),
                 AvatarUrl = string.IsNullOrWhiteSpace(req.AvatarUrl) ? null : req.AvatarUrl,
+                req.DictationEnabled,
             }
         );
 
@@ -158,6 +173,7 @@ public sealed class UsersController : ControllerBase
             telefono = req.Phone?.Trim(),
             numeroColegiado = string.IsNullOrWhiteSpace(req.LicenseNumber) ? "MPPS Pendiente" : req.LicenseNumber.Trim(),
             avatarUrl = string.IsNullOrWhiteSpace(req.AvatarUrl) ? null : req.AvatarUrl,
+            dictationEnabled = req.DictationEnabled,
             activo = true
         });
     }
@@ -175,6 +191,7 @@ public sealed class UsersController : ControllerBase
             : req.Username.Trim().ToLowerInvariant();
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureDictationColumnAsync(conn);
 
         var conflict = await conn.QueryFirstOrDefaultAsync<int>(
             """
@@ -199,6 +216,7 @@ public sealed class UsersController : ControllerBase
                 Telefono = @Telefono,
                 NumeroColegiado = @NumeroColegiado,
                 AvatarUrl = @AvatarUrl,
+                DictationEnabled = @DictationEnabled,
                 PasswordHash = COALESCE(@PasswordHash, PasswordHash),
                 UpdatedAt = GETDATE()
             WHERE Id = @Id
@@ -212,6 +230,7 @@ public sealed class UsersController : ControllerBase
                 Telefono = string.IsNullOrWhiteSpace(req.Phone) ? null : req.Phone.Trim(),
                 NumeroColegiado = string.IsNullOrWhiteSpace(req.LicenseNumber) ? "MPPS Pendiente" : req.LicenseNumber.Trim(),
                 AvatarUrl = string.IsNullOrWhiteSpace(req.AvatarUrl) ? null : req.AvatarUrl,
+                req.DictationEnabled,
                 PasswordHash = newHash,
             }
         );
@@ -326,6 +345,7 @@ public sealed class UsersController : ControllerBase
             : req.Username.Trim().ToLowerInvariant();
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureDictationColumnAsync(conn);
 
         var exists = await conn.QueryFirstOrDefaultAsync<int>(
             """
@@ -390,6 +410,7 @@ public sealed class UsersController : ControllerBase
             : req.Username.Trim().ToLowerInvariant();
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await EnsureDictationColumnAsync(conn);
 
         var conflict = await conn.QueryFirstOrDefaultAsync<int>(
             """

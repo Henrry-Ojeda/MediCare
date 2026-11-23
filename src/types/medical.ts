@@ -308,6 +308,7 @@ export interface DoctorProfile {
   avatarUrl?: string;
   specialty: Specialty;
   licenseNumber: string;
+  dictationEnabled?: boolean;
 }
 
 export interface AssistantPermissions {

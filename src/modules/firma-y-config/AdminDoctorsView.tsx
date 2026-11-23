@@ -42,6 +42,7 @@ export const AdminDoctorsView: React.FC = () => {
   const [showPwd, setShowPwd] = useState(false);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [dictationEnabled, setDictationEnabled] = useState(false);
   const [selectedAssistantIds, setSelectedAssistantIds] = useState<string[]>([]);
   const [selectedClinicIds, setSelectedClinicIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,6 +58,7 @@ export const AdminDoctorsView: React.FC = () => {
     setPassword('');
     setLicenseNumber('');
     setAvatarUrl('');
+    setDictationEnabled(false);
     setSelectedAssistantIds([]);
     setSelectedClinicIds([]);
   };
@@ -171,6 +173,7 @@ export const AdminDoctorsView: React.FC = () => {
         avatarUrl: avatarUrl || undefined,
         specialty: 'Pediatría',
         licenseNumber: licenseNumber.trim() || 'MPPS Pendiente',
+        dictationEnabled,
         password: password.trim() || undefined,
       };
       const ok = await updateDoctorProfile(updated);
@@ -189,6 +192,7 @@ export const AdminDoctorsView: React.FC = () => {
         avatarUrl: avatarUrl || undefined,
         specialty: 'Pediatría',
         licenseNumber: licenseNumber.trim() || 'MPPS Pendiente',
+        dictationEnabled,
         password: password.trim(),
       });
       if (!created) return;
@@ -211,6 +215,7 @@ export const AdminDoctorsView: React.FC = () => {
     setPassword('');
     setLicenseNumber(doc.licenseNumber);
     setAvatarUrl(doc.avatarUrl || '');
+    setDictationEnabled(Boolean(doc.dictationEnabled));
     setSelectedAssistantIds(
       assistants.filter((a) => a.assignedDoctorIds.includes(doc.id)).map((a) => a.id)
     );
@@ -418,6 +423,25 @@ export const AdminDoctorsView: React.FC = () => {
           </div>
         </div>
 
+        <div className="pt-2 border-t border-slate-100">
+          <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dictationEnabled}
+              onChange={(e) => setDictationEnabled(e.target.checked)}
+              className="mt-0.5 rounded border-slate-300 text-[#0284C7]"
+            />
+            <div>
+              <p className="text-xs font-bold text-slate-800">
+                Habilitar Dictado Clínico Inteligente (Plan IA)
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Solo el administrador puede activar o desactivar esta función según el plan del médico. El médico no puede ver ni editar este ajuste.
+              </p>
+            </div>
+          </label>
+        </div>
+
         <div className="pt-2 border-t border-slate-100 space-y-2">
           <p className="text-[11px] font-bold text-slate-600">
             Clínicas donde atiende (puede seleccionar varias clínicas registradas en el sistema):
@@ -532,7 +556,18 @@ export const AdminDoctorsView: React.FC = () => {
                     )}
                   </div>
                   <div className="space-y-1.5 min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{doc.name}</p>
+                    <p className="text-sm font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                      <span>{doc.name}</span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          doc.dictationEnabled
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        }`}
+                      >
+                        {doc.dictationEnabled ? 'Plan IA: Dictado activo' : 'Sin Dictado IA'}
+                      </span>
+                    </p>
                   <p className="text-xs text-slate-600">
                     {doc.specialty} • {doc.licenseNumber}
                   </p>

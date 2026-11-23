@@ -307,6 +307,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 avatarUrl: d.avatarUrl || undefined,
                 specialty: 'Pediatría',
                 licenseNumber: d.numeroColegiado || 'MPPS Pendiente',
+                dictationEnabled: Boolean(d.dictationEnabled),
               };
             })
           );
@@ -1078,6 +1079,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           phone: doctor.phone,
           licenseNumber: doctor.licenseNumber,
           avatarUrl: doctor.avatarUrl,
+          dictationEnabled: Boolean(doctor.dictationEnabled),
         });
         const created: DoctorProfile = {
           ...doctor,
@@ -1087,6 +1089,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: res.email,
           licenseNumber: res.numeroColegiado,
           avatarUrl: res.avatarUrl,
+          dictationEnabled: Boolean(res.dictationEnabled ?? doctor.dictationEnabled),
         };
         setDoctors((prev) => [...prev, created]);
         showToast(`Perfil de Doctor ${created.name} creado en base de datos`);
@@ -1117,6 +1120,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           phone: updated.phone,
           licenseNumber: updated.licenseNumber,
           avatarUrl: updated.avatarUrl,
+          dictationEnabled: Boolean(updated.dictationEnabled),
         });
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Error al actualizar el médico.');

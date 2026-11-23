@@ -27,6 +27,7 @@ export interface AuthUser {
   avatarUrl?: string;
   specialty?: string;
   licenseNumber?: string;
+  dictationEnabled?: boolean;
 }
 
 export interface StaffMember {

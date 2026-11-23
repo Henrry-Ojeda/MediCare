@@ -260,6 +260,7 @@ export const medicareApi = {
         numeroColegiado?: string;
         avatarUrl?: string;
         activo: boolean;
+        dictationEnabled?: boolean;
       }>
     >('/users/doctors'),
 
@@ -272,6 +273,7 @@ export const medicareApi = {
     phone?: string;
     licenseNumber?: string;
     avatarUrl?: string;
+    dictationEnabled?: boolean;
   }) =>
     apiFetch<{
       id: string;
@@ -281,6 +283,7 @@ export const medicareApi = {
       telefono?: string;
       numeroColegiado: string;
       avatarUrl?: string;
+      dictationEnabled?: boolean;
     }>('/users/doctors', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -297,6 +300,7 @@ export const medicareApi = {
       phone?: string;
       licenseNumber?: string;
       avatarUrl?: string;
+      dictationEnabled?: boolean;
     }
   ) =>
     apiFetch<{ ok: boolean; id: string }>(`/users/doctors/${id}`, {
