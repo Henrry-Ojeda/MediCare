@@ -3,8 +3,10 @@ import { medicareApi } from './medicareApi';
 import {
   Appointment,
   MasterVaccineItem,
+  MedicalStudyFile,
   Patient,
   PastConsultationSummary,
+  RecipeTemplateConfig,
   VitalSigns,
   WaitingRoomStage,
 } from '../types/medical';
@@ -105,14 +107,73 @@ export const clinicalSync = {
     patients?: Patient[];
     appointments?: Appointment[];
     masterVaccines?: MasterVaccineItem[];
+    templatePatch?: Partial<RecipeTemplateConfig>;
   } | null> {
     if (!hasRealAuthSession()) return null;
     try {
-      const [rawPatients, rawAppointments, rawVaccines] = await Promise.all([
+      const [rawPatients, rawAppointments, rawVaccines, bootstrap] = await Promise.all([
         medicareApi.getPatients(),
         medicareApi.getAppointments(),
         medicareApi.getMasterVaccines(),
+        medicareApi.getBootstrap().catch(() => null),
       ]);
+
+      let templatePatch: Partial<RecipeTemplateConfig> | undefined;
+      if (bootstrap && typeof bootstrap === 'object') {
+        const b = bootstrap as Record<string, unknown>;
+        const t = (b.template || null) as AnyRecord | null;
+        const tenant = (b.tenant || null) as AnyRecord | null;
+        if (t || tenant) {
+          templatePatch = {
+            ...(tenant?.NombreComercial || tenant?.nombreComercial
+              ? { clinicName: String(tenant.NombreComercial ?? tenant.nombreComercial) }
+              : {}),
+            ...(tenant?.Rif || tenant?.rif ? { rif: String(tenant.Rif ?? tenant.rif) } : {}),
+            ...(tenant?.Direccion || tenant?.direccion
+              ? { address: String(tenant.Direccion ?? tenant.direccion) }
+              : {}),
+            ...(tenant?.Telefono || tenant?.telefono
+              ? { phone: String(tenant.Telefono ?? tenant.telefono) }
+              : {}),
+            ...(t?.ClinicSubtitle || t?.clinicSubtitle
+              ? { clinicSubtitle: String(t.ClinicSubtitle ?? t.clinicSubtitle) }
+              : {}),
+            ...(t?.LogoPosition || t?.logoPosition
+              ? {
+                  logoPosition: String(
+                    t.LogoPosition ?? t.logoPosition
+                  ) as RecipeTemplateConfig['logoPosition'],
+                }
+              : {}),
+            ...(t?.FontFamily || t?.fontFamily
+              ? {
+                  fontFamily: String(
+                    t.FontFamily ?? t.fontFamily
+                  ) as RecipeTemplateConfig['fontFamily'],
+                }
+              : {}),
+            ...(t?.BorderColor || t?.borderColor
+              ? {
+                  borderColor: String(
+                    t.BorderColor ?? t.borderColor
+                  ) as RecipeTemplateConfig['borderColor'],
+                }
+              : {}),
+            ...(t?.ShowQrCode !== undefined || t?.showQrCode !== undefined
+              ? { showQrCode: Boolean(t.ShowQrCode ?? t.showQrCode) }
+              : {}),
+            ...(t?.ShowDigitalSignature !== undefined || t?.showDigitalSignature !== undefined
+              ? { showDigitalSignature: Boolean(t.ShowDigitalSignature ?? t.showDigitalSignature) }
+              : {}),
+            ...(t?.ShowWetStamp !== undefined || t?.showWetStamp !== undefined
+              ? { showWetStamp: Boolean(t.ShowWetStamp ?? t.showWetStamp) }
+              : {}),
+            ...(t?.FooterNote !== undefined || t?.footerNote !== undefined
+              ? { footerNote: String(t.FooterNote ?? t.footerNote ?? '') }
+              : {}),
+          };
+        }
+      }
 
       return {
         patients: Array.isArray(rawPatients) && rawPatients.length > 0
@@ -124,6 +185,7 @@ export const clinicalSync = {
         masterVaccines: Array.isArray(rawVaccines) && rawVaccines.length > 0
           ? rawVaccines.map((r) => mapApiMasterVaccineToModel(r as AnyRecord))
           : undefined,
+        templatePatch,
       };
     } catch {
       return null;
@@ -131,8 +193,8 @@ export const clinicalSync = {
   },
 
   async createPatient(patient: Omit<Patient, 'id' | 'historyNumber'>) {
-    if (!hasRealAuthSession()) return;
-    await medicareApi.createPatient({
+    if (!hasRealAuthSession()) return null;
+    return medicareApi.createPatient({
       firstName: patient.firstName,
       lastName: patient.lastName,
       sex: patient.sex,
@@ -150,6 +212,52 @@ export const clinicalSync = {
       guardianWhatsapp: patient.guardianWhatsapp,
       guardianEmail: patient.guardianEmail,
       specialtyData: patient.perinatal,
+    });
+  },
+
+  async createAppointment(apt: Omit<Appointment, 'id' | 'waitingMinutes'>) {
+    if (!hasRealAuthSession()) return null;
+    return medicareApi.createAppointment({
+      patientId: apt.patientId,
+      doctorUserId: apt.doctorId,
+      specialtyId: 1,
+      date: apt.date,
+      time: apt.time,
+      durationMinutes: apt.durationMinutes || 30,
+      type: apt.type || 'control',
+      reason: apt.reason || 'Control Pediátrico',
+      stage: apt.stage || 'programado',
+    });
+  },
+
+  async createPatientStudy(patientId: string, study: Omit<MedicalStudyFile, 'id'>) {
+    if (!hasRealAuthSession()) return null;
+    return medicareApi.createPatientStudy(patientId, {
+      title: study.title,
+      category: study.category,
+      studyDate: study.date,
+      summary: study.summary,
+      imageUrl: study.imageUrl,
+      valuesHighlight: study.valuesHighlight,
+      specialtyId: 1,
+    });
+  },
+
+  async saveRecipeTemplate(cfg: RecipeTemplateConfig) {
+    if (!hasRealAuthSession()) return null;
+    return medicareApi.saveRecipeTemplate({
+      clinicName: cfg.clinicName,
+      clinicSubtitle: cfg.clinicSubtitle,
+      rif: cfg.rif,
+      address: cfg.address,
+      phone: cfg.phone,
+      logoPosition: cfg.logoPosition,
+      fontFamily: cfg.fontFamily,
+      borderColor: cfg.borderColor,
+      showQrCode: cfg.showQrCode,
+      showDigitalSignature: cfg.showDigitalSignature,
+      showWetStamp: cfg.showWetStamp,
+      footerNote: cfg.footerNote,
     });
   },
 
