@@ -258,6 +258,9 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       if (data.appointments) setAppointments(data.appointments);
       if (data.masterVaccines) setMasterVaccines(data.masterVaccines);
+      if (data.templatePatch) {
+        setTemplateConfig((prev) => ({ ...prev, ...data.templatePatch }));
+      }
     });
     if (getAuthToken()) {
       Promise.all([
@@ -420,7 +423,28 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     patientsRef.current = [created, ...patientsRef.current];
     setPatients((prev) => [created, ...prev]);
     setSelectedPatientId(created.id);
-    clinicalSync.createPatient(newPatientData).catch(() => {});
+    clinicalSync
+      .createPatient(newPatientData)
+      .then((res) => {
+        if (!res) return;
+        const realId = String(res.Id ?? res.id ?? '');
+        const realHist = String(res.HistoryNumber ?? res.historyNumber ?? '');
+        if (!realId) return;
+        setPatients((prev) =>
+          prev.map((p) =>
+            p.id === created.id
+              ? { ...p, id: realId, historyNumber: realHist || p.historyNumber }
+              : p
+          )
+        );
+        patientsRef.current = patientsRef.current.map((p) =>
+          p.id === created.id
+            ? { ...p, id: realId, historyNumber: realHist || p.historyNumber }
+            : p
+        );
+        setSelectedPatientId((prev) => (prev === created.id ? realId : prev));
+      })
+      .catch(() => {});
     showToast(`Expediente ${created.historyNumber} creado exitosamente`);
     return created;
   };
@@ -446,6 +470,17 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       waitingMinutes: apt.stage === 'en_sala' ? 1 : 0,
     };
     setAppointments((prev) => [created, ...prev]);
+    clinicalSync
+      .createAppointment(apt)
+      .then((res) => {
+        if (!res) return;
+        const realId = String(res.Id ?? res.id ?? '');
+        if (!realId) return;
+        setAppointments((prev) =>
+          prev.map((item) => (item.id === created.id ? { ...item, id: realId } : item))
+        );
+      })
+      .catch(() => {});
     pushNotification({
       title: 'Nueva Cita Agendada',
       message: `${apt.patientName} programado para las ${apt.time}`,
@@ -462,6 +497,24 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setPatients((prev) =>
       prev.map((p) => (p.id === patientId ? { ...p, studies: [newStudy, ...p.studies] } : p))
     );
+    clinicalSync
+      .createPatientStudy(patientId, study)
+      .then((res) => {
+        if (!res) return;
+        const realId = String(res.Id ?? res.id ?? '');
+        if (!realId) return;
+        setPatients((prev) =>
+          prev.map((p) =>
+            p.id === patientId
+              ? {
+                  ...p,
+                  studies: p.studies.map((s) => (s.id === newStudy.id ? { ...s, id: realId } : s)),
+                }
+              : p
+          )
+        );
+      })
+      .catch(() => {});
     showToast(`Resultado médico "${study.title}" agregado al historial`);
   };
 
@@ -1358,6 +1411,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             } catch {
               // ignore storage errors
             }
+            clinicalSync.saveRecipeTemplate(next).catch(() => {});
             return next;
           }),
         updateTenantConfig: (partial) => setTenantConfig((p) => ({ ...p, ...partial })),

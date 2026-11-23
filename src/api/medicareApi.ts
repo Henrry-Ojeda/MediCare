@@ -65,6 +65,12 @@ export const medicareApi = {
 
   getBootstrap: () => apiFetch<Record<string, unknown>>('/bootstrap'),
 
+  saveRecipeTemplate: (payload: Record<string, unknown>) =>
+    apiFetch<Record<string, unknown>>('/bootstrap/recipe-template', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
   getPatients: (q?: string) =>
     apiFetch<unknown[]>(`/patients${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 
@@ -79,6 +85,12 @@ export const medicareApi = {
   updatePatient: (id: string, payload: Record<string, unknown>) =>
     apiFetch<Record<string, unknown>>(`/patients/${id}`, {
       method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  createPatientStudy: (patientId: string, payload: Record<string, unknown>) =>
+    apiFetch<Record<string, unknown>>(`/patients/${patientId}/studies`, {
+      method: 'POST',
       body: JSON.stringify(payload),
     }),
 

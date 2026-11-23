@@ -460,5 +460,58 @@ public sealed class PatientsController : ControllerBase
             throw;
         }
     }
+
+    public sealed record CreatePatientStudyRequest(
+        string Title,
+        string Category,
+        string? StudyDate,
+        string Summary,
+        string? ImageUrl,
+        string? ValuesHighlight,
+        int? SpecialtyId
+    );
+
+    [HttpPost("{id:guid}/studies")]
+    public async Task<IActionResult> CreateStudy(
+        Guid id,
+        [FromBody] CreatePatientStudyRequest req,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.Title))
+            return BadRequest(new { message = "El título del estudio es requerido." });
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var parsedDate = DateTime.TryParse(req.StudyDate, out var dt) ? dt.Date : DateTime.UtcNow.Date;
+        var created = await conn.QuerySingleAsync(
+            """
+            INSERT INTO dbo.TB_ESTUDIOS_MEDICOS (
+                PatientId, SpecialtyId, Title, Category, StudyDate, Summary, ImageUrl, ValuesHighlight
+            )
+            OUTPUT INSERTED.*
+            VALUES (
+                @PatientId, @SpecialtyId, @Title, @Category, @StudyDate, @Summary, @ImageUrl, @ValuesHighlight
+            )
+            """,
+            new
+            {
+                PatientId = id,
+                SpecialtyId = req.SpecialtyId ?? 1,
+                Title = req.Title.Trim(),
+                Category = string.IsNullOrWhiteSpace(req.Category) ? "Laboratorio" : req.Category.Trim(),
+                StudyDate = parsedDate,
+                Summary = req.Summary ?? string.Empty,
+                ImageUrl = req.ImageUrl,
+                ValuesHighlight = req.ValuesHighlight
+            }
+        );
+
+        await _audit.RecordAsync(
+            conn, null, HttpContext, "Registro de Estudio Médico",
+            "TB_ESTUDIOS_MEDICOS", created.Id.ToString(), id,
+            newValue: new { req.Title, req.Category }
+        );
+
+        return Ok(created);
+    }
 }
 
