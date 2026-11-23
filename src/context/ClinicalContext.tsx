@@ -72,6 +72,7 @@ interface ClinicalContextValue {
   navigateToPatient360: (patientId: string) => void;
   navigateToPatientVaccines: (patientId: string) => void;
   navigateToActiveConsultation: (patientId: string) => void;
+  refreshPatient360: (patientId: string) => Promise<void>;
 
   // Operaciones clínicas
   addPatient: (newPatient: Omit<Patient, 'id' | 'historyNumber'>) => Patient;
@@ -356,14 +357,27 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         (a.assignedDoctorIds || []).includes(matchedDoctorId!)
     );
 
+  const refreshPatient360 = React.useCallback(async (patientId: string) => {
+    const detail = await clinicalSync.fetchPatient360(patientId);
+    if (!detail) return;
+    setPatients((prev) =>
+      prev.map((p) => (p.id === patientId ? { ...p, ...detail } : p))
+    );
+    patientsRef.current = patientsRef.current.map((p) =>
+      p.id === patientId ? { ...p, ...detail } : p
+    );
+  }, []);
+
   const navigateToPatient360 = (patientId: string) => {
     setSelectedPatientId(patientId);
     setCurrentView('paciente-detalle');
+    void refreshPatient360(patientId);
   };
 
   const navigateToPatientVaccines = (patientId: string) => {
     setSelectedPatientId(patientId);
     setCurrentView('vacunas-carnet');
+    void refreshPatient360(patientId);
   };
 
   const patientsRef = React.useRef<Patient[]>(patients);
@@ -1382,6 +1396,7 @@ export const ClinicalProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         navigateToPatient360,
         navigateToPatientVaccines,
         navigateToActiveConsultation,
+        refreshPatient360,
         addPatient,
         updatePatient,
         addAppointment,

@@ -77,8 +77,23 @@ export const RecipeDispatchModal: React.FC = () => {
             <RecipeDocumentPreview
               patient={patient}
               consultation={consultation}
-              templateConfig={templateConfig}
-              doctorSignature={doctorSignature}
+              templateConfig={
+                consultation.recipeTemplate
+                  ? { ...templateConfig, ...consultation.recipeTemplate }
+                  : templateConfig
+              }
+              doctorSignature={
+                consultation.doctorLicense
+                  ? {
+                      ...doctorSignature,
+                      doctorName: consultation.doctorName || doctorSignature.doctorName,
+                      mppsNumber: consultation.doctorLicense,
+                    }
+                  : {
+                      ...doctorSignature,
+                      doctorName: consultation.doctorName || doctorSignature.doctorName,
+                    }
+              }
               activePage={activePdfPage}
             />
           </div>

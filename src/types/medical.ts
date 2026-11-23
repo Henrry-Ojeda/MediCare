@@ -125,6 +125,8 @@ export interface PastConsultationSummary {
   specialty: Specialty;
   doctorId?: string;
   doctorName: string;
+  doctorLicense?: string;
+  hasDiagnosisAccess?: boolean;
   reason: string;
   cie10Code: string;
   cie10Name: string;
@@ -136,6 +138,7 @@ export interface PastConsultationSummary {
   prescriptions: PrescriptionItem[];
   parentGuide: string;
   alarmSigns: string[];
+  recipeTemplate?: Partial<RecipeTemplateConfig>;
 }
 
 export interface DiagnosisPermission {
