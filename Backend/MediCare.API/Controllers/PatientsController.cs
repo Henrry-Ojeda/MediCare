@@ -390,5 +390,128 @@ public sealed class PatientsController : ControllerBase
             throw;
         }
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] CreatePatientRequest req, CancellationToken ct)
+    {
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        try
+        {
+            var updated = await conn.QueryFirstOrDefaultAsync(
+                """
+                UPDATE dbo.TB_PACIENTES
+                SET FirstName = @FirstName,
+                    LastName = @LastName,
+                    Sex = @Sex,
+                    BirthDate = @BirthDate,
+                    IdDocument = @IdDocument,
+                    BloodType = @BloodType,
+                    CriticalAllergiesJson = @CriticalAllergiesJson,
+                    ChronicConditionsJson = @ChronicConditionsJson,
+                    PreviousHospitalizations = @PreviousHospitalizations,
+                    GuardianName = @GuardianName,
+                    GuardianRelation = @GuardianRelation,
+                    GuardianIdDocument = @GuardianIdDocument,
+                    GuardianOccupation = @GuardianOccupation,
+                    GuardianWhatsapp = @GuardianWhatsapp,
+                    GuardianEmail = @GuardianEmail
+                OUTPUT INSERTED.*
+                WHERE Id = @Id
+                """,
+                new
+                {
+                    Id = id,
+                    req.FirstName,
+                    req.LastName,
+                    req.Sex,
+                    req.BirthDate,
+                    req.IdDocument,
+                    req.BloodType,
+                    CriticalAllergiesJson = JsonSerializer.Serialize(req.CriticalAllergies ?? []),
+                    ChronicConditionsJson = JsonSerializer.Serialize(req.ChronicConditions ?? []),
+                    req.PreviousHospitalizations,
+                    req.GuardianName,
+                    req.GuardianRelation,
+                    req.GuardianIdDocument,
+                    req.GuardianOccupation,
+                    req.GuardianWhatsapp,
+                    req.GuardianEmail
+                },
+                transaction: tx
+            );
+
+            if (updated is null)
+                return NotFound(new { message = "Paciente no encontrado." });
+
+            await _audit.RecordAsync(
+                conn, tx, HttpContext, "Actualización de Expediente",
+                "TB_PACIENTES", id.ToString(), id,
+                newValue: new { req.FirstName, req.LastName, req.GuardianWhatsapp }
+            );
+
+            await tx.CommitAsync(ct);
+            return Ok(updated);
+        }
+        catch
+        {
+            await tx.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public sealed record CreatePatientStudyRequest(
+        string Title,
+        string Category,
+        string? StudyDate,
+        string Summary,
+        string? ImageUrl,
+        string? ValuesHighlight,
+        int? SpecialtyId
+    );
+
+    [HttpPost("{id:guid}/studies")]
+    public async Task<IActionResult> CreateStudy(
+        Guid id,
+        [FromBody] CreatePatientStudyRequest req,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.Title))
+            return BadRequest(new { message = "El título del estudio es requerido." });
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var parsedDate = DateTime.TryParse(req.StudyDate, out var dt) ? dt.Date : DateTime.UtcNow.Date;
+        var created = await conn.QuerySingleAsync(
+            """
+            INSERT INTO dbo.TB_ESTUDIOS_MEDICOS (
+                PatientId, SpecialtyId, Title, Category, StudyDate, Summary, ImageUrl, ValuesHighlight
+            )
+            OUTPUT INSERTED.*
+            VALUES (
+                @PatientId, @SpecialtyId, @Title, @Category, @StudyDate, @Summary, @ImageUrl, @ValuesHighlight
+            )
+            """,
+            new
+            {
+                PatientId = id,
+                SpecialtyId = req.SpecialtyId ?? 1,
+                Title = req.Title.Trim(),
+                Category = string.IsNullOrWhiteSpace(req.Category) ? "Laboratorio" : req.Category.Trim(),
+                StudyDate = parsedDate,
+                Summary = req.Summary ?? string.Empty,
+                ImageUrl = req.ImageUrl,
+                ValuesHighlight = req.ValuesHighlight
+            }
+        );
+
+        await _audit.RecordAsync(
+            conn, null, HttpContext, "Registro de Estudio Médico",
+            "TB_ESTUDIOS_MEDICOS", created.Id.ToString(), id,
+            newValue: new { req.Title, req.Category }
+        );
+
+        return Ok(created);
+    }
 }
 
