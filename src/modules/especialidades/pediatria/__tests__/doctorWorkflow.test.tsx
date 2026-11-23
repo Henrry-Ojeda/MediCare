@@ -12,6 +12,7 @@ import { PediatricConsultationView } from '../views/PediatricConsultationView';
 vi.mock('../../../../api/clinicalSync', () => ({
   clinicalSync: {
     hydrateFromApi: vi.fn().mockResolvedValue(null),
+    fetchPatient360: vi.fn().mockResolvedValue(null),
     createPatient: vi.fn().mockResolvedValue(null),
     updatePatient: vi.fn().mockResolvedValue(undefined),
     createAppointment: vi.fn().mockResolvedValue(null),

@@ -75,6 +75,26 @@ public sealed class PatientsController : ControllerBase
     {
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
 
+        await conn.ExecuteAsync(
+            """
+            IF COL_LENGTH('dbo.TB_ESTUDIOS_MEDICOS', 'CreatedByDoctorUserId') IS NULL
+                ALTER TABLE dbo.TB_ESTUDIOS_MEDICOS ADD CreatedByDoctorUserId UNIQUEIDENTIFIER NULL;
+            IF COL_LENGTH('dbo.TB_PLANTILLAS_RECETA', 'DoctorUserId') IS NULL
+                ALTER TABLE dbo.TB_PLANTILLAS_RECETA ADD
+                    DoctorUserId UNIQUEIDENTIFIER NULL,
+                    ClinicName NVARCHAR(200) NULL,
+                    Rif NVARCHAR(80) NULL,
+                    Address NVARCHAR(300) NULL,
+                    Phone NVARCHAR(80) NULL,
+                    Orientation NVARCHAR(30) NULL,
+                    BackgroundTemplateDataUrl NVARCHAR(MAX) NULL,
+                    HideDefaultHeaderOnBg BIT NULL,
+                    ContentTopPaddingPx INT NULL,
+                    ContentBottomPaddingPx INT NULL,
+                    BackgroundOpacity FLOAT NULL;
+            """
+        );
+
         var patient = await conn.QueryFirstOrDefaultAsync(
             """
             SELECT p.*, e.Nombre AS PrimarySpecialtyName, e.Codigo AS PrimarySpecialtyCode
@@ -97,26 +117,30 @@ public sealed class PatientsController : ControllerBase
             new { PatientId = id }
         );
 
-        var vitalsHistory = await conn.QueryAsync(
+        var vitalsHistory = (await conn.QueryAsync(
             "SELECT TOP 50 * FROM dbo.TB_SIGNOS_VITALES WHERE PatientId = @PatientId ORDER BY RecordedAt DESC",
             new { PatientId = id }
-        );
+        )).ToList();
 
         Guid? currentUserId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : null;
+        var currentRole = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        bool isAdmin = currentRole.Equals("ADMIN", StringComparison.OrdinalIgnoreCase)
+            || currentRole.Equals("SUPERADMIN", StringComparison.OrdinalIgnoreCase);
 
-        var rawConsultations = await conn.QueryAsync<dynamic>(
+        var rawConsultations = (await conn.QueryAsync<dynamic>(
             """
-            SELECT c.*, u.NombreCompleto AS DoctorName, e.Nombre AS SpecialtyName,
+            SELECT c.*, u.NombreCompleto AS DoctorName, u.NumeroColegiado AS DoctorLicense,
+                   e.Nombre AS SpecialtyName,
                    CASE
-                     WHEN @ViewerSpecialtyId IS NULL
-                       OR c.SpecialtyId = @ViewerSpecialtyId
+                     WHEN @IsAdmin = 1
+                       OR @CurrentUserId IS NULL
                        OR c.DoctorUserId = @CurrentUserId
                        OR EXISTS (
                          SELECT 1 FROM dbo.TB_PERMISOS_DIAGNOSTICO perm
                          WHERE perm.PatientId = c.PatientId
                            AND perm.Activo = 1
                            AND (perm.ExpiresAt IS NULL OR perm.ExpiresAt > GETDATE())
-                           AND perm.TargetSpecialtyId = @ViewerSpecialtyId
+                           AND perm.TargetDoctorUserId = @CurrentUserId
                            AND (perm.ConsultationId IS NULL OR perm.ConsultationId = c.Id)
                        )
                      THEN CAST(1 AS BIT)
@@ -128,12 +152,51 @@ public sealed class PatientsController : ControllerBase
             WHERE c.PatientId = @PatientId
             ORDER BY c.ConsultationDate DESC
             """,
-            new { PatientId = id, ViewerSpecialtyId = viewerSpecialtyId, CurrentUserId = currentUserId }
-        );
+            new { PatientId = id, CurrentUserId = currentUserId, IsAdmin = isAdmin ? 1 : 0 }
+        )).ToList();
+
+        var consultationIds = rawConsultations.Select(c => (Guid)c.Id).ToList();
+        var prescriptionsByCons = new Dictionary<Guid, List<dynamic>>();
+        if (consultationIds.Count > 0)
+        {
+            var allRx = await conn.QueryAsync<dynamic>(
+                "SELECT * FROM dbo.TB_RECETAS_CONSULTA WHERE ConsultationId IN @Ids",
+                new { Ids = consultationIds }
+            );
+            foreach (var rx in allRx)
+            {
+                Guid cid = (Guid)rx.ConsultationId;
+                if (!prescriptionsByCons.TryGetValue(cid, out var list))
+                {
+                    list = [];
+                    prescriptionsByCons[cid] = list;
+                }
+                list.Add(rx);
+            }
+        }
+
+        var doctorIds = rawConsultations.Select(c => (Guid)c.DoctorUserId).Distinct().ToList();
+        var templatesByDoctor = new Dictionary<Guid, dynamic>();
+        if (doctorIds.Count > 0)
+        {
+            var docTemplates = await conn.QueryAsync<dynamic>(
+                "SELECT * FROM dbo.TB_PLANTILLAS_RECETA WHERE DoctorUserId IN @DoctorIds",
+                new { DoctorIds = doctorIds }
+            );
+            foreach (var tpl in docTemplates)
+            {
+                if (tpl.DoctorUserId is Guid did && !templatesByDoctor.ContainsKey(did))
+                    templatesByDoctor[did] = tpl;
+            }
+        }
 
         var consultations = rawConsultations.Select(c =>
         {
             bool hasAccess = (bool)c.HasDiagnosisAccess;
+            Guid cid = (Guid)c.Id;
+            Guid docId = (Guid)c.DoctorUserId;
+            prescriptionsByCons.TryGetValue(cid, out var rxList);
+            templatesByDoctor.TryGetValue(docId, out var docTemplate);
             return new
             {
                 c.Id,
@@ -141,17 +204,20 @@ public sealed class PatientsController : ControllerBase
                 c.AppointmentId,
                 c.DoctorUserId,
                 c.DoctorName,
+                DoctorLicense = (string?)c.DoctorLicense,
                 c.SpecialtyId,
                 c.SpecialtyName,
                 c.ConsultationDate,
                 hasDiagnosisAccess = hasAccess,
-                Reason = hasAccess ? (string)c.Reason : "Diagnóstico restringido: requiere permiso del médico remitente.",
-                Cie10Code = hasAccess ? (string)c.Cie10Code : "RESTRINGIDO",
-                Cie10Name = hasAccess ? (string)c.Cie10Name : "Diagnóstico protegido (sin permiso de especialidad)",
+                Reason = hasAccess ? (string)c.Reason : "Diagnóstico privado del médico tratante (requiere permiso).",
+                Cie10Code = hasAccess ? (string)c.Cie10Code : "PRIVADO",
+                Cie10Name = hasAccess ? (string)c.Cie10Name : "Diagnóstico protegido (solo el médico autor o con permiso explícito)",
                 PhysicalExamSummary = hasAccess ? (string)c.PhysicalExamSummary : null,
                 SpecialtyExamJson = hasAccess ? (string?)c.SpecialtyExamJson : null,
-                PatientGuide = hasAccess ? (string?)c.PatientGuide : null,
-                AlarmSignsJson = hasAccess ? (string)c.AlarmSignsJson : "[]",
+                PatientGuide = (string?)c.PatientGuide,
+                AlarmSignsJson = (string)c.AlarmSignsJson,
+                Prescriptions = rxList ?? [],
+                RecipeTemplate = docTemplate,
             };
         });
 
@@ -182,10 +248,32 @@ public sealed class PatientsController : ControllerBase
             new { PatientId = id }
         );
 
-        // Los exámenes y estudios realizados NO requieren permiso de diagnóstico
+        // Exámenes médicos: visibles entre médicos asociados a una misma clínica;
+        // si el médico no tiene clínica asociada, solo ve los propios.
         var studies = await conn.QueryAsync(
-            "SELECT * FROM dbo.TB_ESTUDIOS_MEDICOS WHERE PatientId = @PatientId ORDER BY StudyDate DESC",
-            new { PatientId = id }
+            """
+            SELECT s.*, u.NombreCompleto AS CreatedByDoctorName
+            FROM dbo.TB_ESTUDIOS_MEDICOS s
+            LEFT JOIN dbo.TB_USUARIOS u ON u.Id = s.CreatedByDoctorUserId
+            WHERE s.PatientId = @PatientId
+              AND (
+                @IsAdmin = 1
+                OR @CurrentUserId IS NULL
+                OR s.CreatedByDoctorUserId IS NULL
+                OR s.CreatedByDoctorUserId = @CurrentUserId
+                OR EXISTS (
+                  SELECT 1
+                  FROM dbo.TB_CLINICA_ASIGNACIONES ca1
+                  INNER JOIN dbo.TB_CLINICA_ASIGNACIONES ca2 ON ca1.ClinicaId = ca2.ClinicaId
+                  WHERE ca1.Activo = 1
+                    AND ca2.Activo = 1
+                    AND ca1.MedicoUserId = @CurrentUserId
+                    AND ca2.MedicoUserId = s.CreatedByDoctorUserId
+                )
+              )
+            ORDER BY s.StudyDate DESC
+            """,
+            new { PatientId = id, CurrentUserId = currentUserId, IsAdmin = isAdmin ? 1 : 0 }
         );
 
         return Ok(new
@@ -481,15 +569,22 @@ public sealed class PatientsController : ControllerBase
             return BadRequest(new { message = "El título del estudio es requerido." });
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        await conn.ExecuteAsync(
+            """
+            IF COL_LENGTH('dbo.TB_ESTUDIOS_MEDICOS', 'CreatedByDoctorUserId') IS NULL
+                ALTER TABLE dbo.TB_ESTUDIOS_MEDICOS ADD CreatedByDoctorUserId UNIQUEIDENTIFIER NULL;
+            """
+        );
+        Guid? createdByDoctorId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : null;
         var parsedDate = DateTime.TryParse(req.StudyDate, out var dt) ? dt.Date : DateTime.UtcNow.Date;
         var created = await conn.QuerySingleAsync(
             """
             INSERT INTO dbo.TB_ESTUDIOS_MEDICOS (
-                PatientId, SpecialtyId, Title, Category, StudyDate, Summary, ImageUrl, ValuesHighlight
+                PatientId, SpecialtyId, Title, Category, StudyDate, Summary, ImageUrl, ValuesHighlight, CreatedByDoctorUserId
             )
             OUTPUT INSERTED.*
             VALUES (
-                @PatientId, @SpecialtyId, @Title, @Category, @StudyDate, @Summary, @ImageUrl, @ValuesHighlight
+                @PatientId, @SpecialtyId, @Title, @Category, @StudyDate, @Summary, @ImageUrl, @ValuesHighlight, @CreatedByDoctorUserId
             )
             """,
             new
@@ -501,7 +596,8 @@ public sealed class PatientsController : ControllerBase
                 StudyDate = parsedDate,
                 Summary = req.Summary ?? string.Empty,
                 ImageUrl = req.ImageUrl,
-                ValuesHighlight = req.ValuesHighlight
+                ValuesHighlight = req.ValuesHighlight,
+                CreatedByDoctorUserId = createdByDoctorId
             }
         );
 

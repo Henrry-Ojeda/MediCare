@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Baby,
   Camera,
@@ -36,9 +36,16 @@ export const PediatricHistoryView: React.FC = () => {
     completeConsultation,
     grantDiagnosisPermission,
     revokeDiagnosisPermission,
+    refreshPatient360,
   } = useClinical();
   const [activeTab, setActiveTab] = useState<HistoryTab>('timeline');
   const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (selectedPatient?.id) {
+      void refreshPatient360(selectedPatient.id);
+    }
+  }, [selectedPatient?.id, refreshPatient360]);
 
   const [studyTitle, setStudyTitle] = useState('');
   const [studyCategory, setStudyCategory] = useState<MedicalStudyFile['category']>('Laboratorio PDF');
