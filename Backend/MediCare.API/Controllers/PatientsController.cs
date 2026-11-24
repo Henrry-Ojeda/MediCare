@@ -182,6 +182,8 @@ public sealed class PatientsController : ControllerBase
                            AND (perm.ExpiresAt IS NULL OR perm.ExpiresAt > GETDATE())
                            AND perm.TargetDoctorUserId = @CurrentUserId
                            AND (perm.ConsultationId IS NULL OR perm.ConsultationId = c.Id)
+                           AND (perm.ScopeClinicId IS NULL OR c.ClinicId = perm.ScopeClinicId)
+                           AND (perm.MaxConsultationDate IS NULL OR c.ConsultationDate <= perm.MaxConsultationDate)
                        )
                      THEN CAST(1 AS BIT)
                      ELSE CAST(0 AS BIT)

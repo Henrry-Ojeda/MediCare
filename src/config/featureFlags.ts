@@ -19,7 +19,7 @@ export const FEATURE_FLAGS = {
 
   // Sprint 2 — Ocultos temporalmente
   enablePaymentsModule: false,
-  enableSaasSubscription: false,
+  enableSaasSubscription: true,
   enableAdvancedReports: false,
   enableAuditLog: false,
   enableOnboarding: false,

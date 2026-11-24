@@ -43,6 +43,15 @@ public sealed class DiagnosisPermissionsController : ControllerBase
         string? Reason
     );
 
+    public sealed record HandoverPermissionRequest(
+        Guid ClinicId,
+        Guid? FromDoctorUserId,
+        Guid TargetDoctorUserId,
+        DateTime CutoffDate,
+        string? Reason,
+        bool IsEmergencyContinuity = false
+    );
+
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] Guid? patientId, CancellationToken ct)
     {
@@ -339,5 +348,80 @@ public sealed class DiagnosisPermissionsController : ControllerBase
             "TB_PERMISOS_DIAGNOSTICO", id.ToString()
         );
         return Ok(new { ok = true });
+    }
+
+    /// <summary>
+    /// S-06 / S-07: Traspaso de cartera al retirarse un médico de una clínica con fecha de corte (CutoffDate)
+    /// o continuidad excepcional auditada (GERENTE + SUPERADMIN).
+    /// </summary>
+    [HttpPost("handover")]
+    [Authorize(Roles = "SUPERADMIN,GERENTE,MEDICO,PEDIATRA")]
+    public async Task<IActionResult> HandoverWithCutoff([FromBody] HandoverPermissionRequest req, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdStr, out var currentUserId))
+            return Unauthorized();
+
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        var isSuperAdmin = role.Equals("SUPERADMIN", StringComparison.OrdinalIgnoreCase);
+
+        if (req.IsEmergencyContinuity && !isSuperAdmin)
+            return StatusCode(403, new { message = "El acceso excepcional de continuidad/emergencia requiere aprobación de SUPERADMIN." });
+
+        var fromDoctorId = req.FromDoctorUserId ?? currentUserId;
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var pediatriaId = await conn.QueryFirstOrDefaultAsync<int?>(
+            "SELECT TOP 1 Id FROM dbo.TB_ESPECIALIDADES WHERE LOWER(Nombre) LIKE '%pediatr%'"
+        ) ?? 1;
+
+        var patientIds = (await conn.QueryAsync<Guid>(
+            """
+            SELECT DISTINCT PatientId
+            FROM dbo.TB_CONSULTAS
+            WHERE DoctorUserId = @FromDoctorId
+              AND (ClinicId = @ClinicId OR ClinicId IS NULL)
+              AND ConsultationDate <= @CutoffDate
+            """,
+            new { FromDoctorId = fromDoctorId, req.ClinicId, req.CutoffDate }
+        )).ToList();
+
+        foreach (var pid in patientIds)
+        {
+            await conn.ExecuteAsync(
+                """
+                INSERT INTO dbo.TB_PERMISOS_DIAGNOSTICO
+                    (Id, PatientId, ConsultationId, GrantedByUserId, GrantedBySpecialtyId,
+                     TargetSpecialtyId, TargetDoctorUserId, Reason, Activo, Status,
+                     ScopeClinicId, MaxConsultationDate, IsEmergencyContinuity)
+                VALUES
+                    (NEWID(), @PatientId, NULL, @GrantedByUserId, @SpecId,
+                     @SpecId, @TargetDoctorUserId, @Reason, 1, 'APPROVED',
+                     @ScopeClinicId, @CutoffDate, @IsEmergency)
+                """,
+                new
+                {
+                    PatientId = pid,
+                    GrantedByUserId = fromDoctorId,
+                    SpecId = pediatriaId,
+                    req.TargetDoctorUserId,
+                    Reason = string.IsNullOrWhiteSpace(req.Reason)
+                        ? $"Traspaso clínico con fecha de corte {req.CutoffDate:yyyy-MM-dd}"
+                        : req.Reason.Trim(),
+                    ScopeClinicId = req.ClinicId,
+                    req.CutoffDate,
+                    IsEmergency = req.IsEmergencyContinuity ? 1 : 0,
+                }
+            );
+        }
+
+        await _audit.RecordAsync(
+            conn, null, HttpContext,
+            req.IsEmergencyContinuity ? "Traspaso Excepcional de Continuidad" : "Traspaso de Cartera con CutoffDate",
+            "TB_PERMISOS_DIAGNOSTICO", req.ClinicId.ToString(),
+            newValue: new { fromDoctorId, req.TargetDoctorUserId, req.CutoffDate, patientsCount = patientIds.Count }
+        );
+
+        return Ok(new { ok = true, patientsTransferred = patientIds.Count, cutoffDate = req.CutoffDate });
     }
 }

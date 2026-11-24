@@ -31,10 +31,15 @@ public sealed class ClinicsController : ControllerBase
         List<ClinicAssignmentInput>? Assignments
     );
 
+    private bool IsSuperAdmin() =>
+        (User.FindFirstValue(ClaimTypes.Role) ?? string.Empty)
+            .Equals("SUPERADMIN", StringComparison.OrdinalIgnoreCase);
+
     private bool IsAdminOrSuperAdmin()
     {
         var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
         return role.Equals("ADMIN", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("GERENTE", StringComparison.OrdinalIgnoreCase)
             || role.Equals("SUPERADMIN", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -43,13 +48,25 @@ public sealed class ClinicsController : ControllerBase
     {
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
 
+        Guid? scopedClinicId = null;
+        if (!IsSuperAdmin() && IsAdminOrSuperAdmin() &&
+            Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid))
+        {
+            scopedClinicId = await conn.QueryFirstOrDefaultAsync<Guid?>(
+                "SELECT ClinicId FROM dbo.TB_USUARIOS WHERE Id = @Id",
+                new { Id = uid }
+            );
+        }
+
         var clinics = (await conn.QueryAsync<dynamic>(
             """
             SELECT Id, Nombre, Rif, Telefono, Email, Direccion, Activa
             FROM dbo.TB_CLINICAS
             WHERE Activa = 1
+              AND (@ScopedClinicId IS NULL OR Id = @ScopedClinicId)
             ORDER BY Nombre ASC
-            """
+            """,
+            new { ScopedClinicId = scopedClinicId }
         )).ToList();
 
         var links = (await conn.QueryAsync<dynamic>(
@@ -99,8 +116,8 @@ public sealed class ClinicsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ClinicUpsertRequest req, CancellationToken ct)
     {
-        if (!IsAdminOrSuperAdmin())
-            return Forbid();
+        if (!IsSuperAdmin())
+            return StatusCode(403, new { message = "Solo el rol SUPERADMIN puede crear nuevas clínicas." });
 
         if (string.IsNullOrWhiteSpace(req.Name))
             return BadRequest(new { message = "El nombre de la clínica es obligatorio." });
@@ -175,8 +192,8 @@ public sealed class ClinicsController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
-        if (!IsAdminOrSuperAdmin())
-            return Forbid();
+        if (!IsSuperAdmin())
+            return StatusCode(403, new { message = "Solo el rol SUPERADMIN puede eliminar clínicas." });
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
         await conn.ExecuteAsync(

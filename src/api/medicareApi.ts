@@ -563,5 +563,63 @@ export const medicareApi = {
     apiFetch<{ ok: boolean }>(`/diagnosis-permissions/${id}`, {
       method: 'DELETE',
     }),
+
+  getMySubscription: () =>
+    apiFetch<{
+      hasSubscription: boolean;
+      status: string;
+      planCode: string;
+      planName: string;
+      planType?: string;
+      expiresAt?: string;
+      maxDoctors: number;
+      maxAssistants: number;
+      allowDictationAi: boolean;
+      allowFinanceBcv: boolean;
+    }>('/subscriptions/me'),
+
+  listSubscriptionPlans: () =>
+    apiFetch<
+      Array<{
+        id: number;
+        code: string;
+        name: string;
+        planType: string;
+        maxDoctors: number;
+        maxAssistants: number;
+        allowDictationAi: boolean;
+        allowFinanceBcv: boolean;
+        priceUsdMonthly: number;
+      }>
+    >('/subscriptions/plans'),
+
+  upgradeToPersonalPlan: () =>
+    apiFetch<{ ok: boolean; hasPersonalPlan: boolean }>('/subscriptions/upgrade-personal', {
+      method: 'POST',
+    }),
+
+  listClinicInvitations: () =>
+    apiFetch<
+      Array<{
+        id: string;
+        clinicId: string;
+        clinicName: string;
+        doctorUserId: string;
+        doctorName: string;
+        status: string;
+        expiresAt: string;
+      }>
+    >('/clinic-invitations'),
+
+  respondClinicInvitation: (id: string, accept: boolean) =>
+    apiFetch<{ ok: boolean; status: string }>(`/clinic-invitations/${id}/doctor-respond`, {
+      method: 'POST',
+      body: JSON.stringify({ accept }),
+    }),
+
+  confirmClinicInvitation: (id: string) =>
+    apiFetch<{ ok: boolean; status: string }>(`/clinic-invitations/${id}/clinic-confirm`, {
+      method: 'POST',
+    }),
 };
 

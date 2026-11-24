@@ -62,6 +62,9 @@ public sealed class AuthController : ControllerBase
             """
             SELECT u.Id, u.Username, u.NombreCompleto, u.Email, u.PasswordHash, u.AvatarUrl, u.Activo,
                    ISNULL(u.DictationEnabled, 0) AS DictationEnabled,
+                   u.ClinicId,
+                   ISNULL(u.HasPersonalPlan, 0) AS HasPersonalPlan,
+                   ISNULL(u.AssistantScope, 'ALL_CLINIC_DOCTORS') AS AssistantScope,
                    r.Codigo AS RoleCodigo, r.Nombre AS RoleNombre
             FROM dbo.TB_USUARIOS u
             INNER JOIN dbo.TB_ROLES r ON r.Id = u.RoleId
@@ -141,6 +144,9 @@ public sealed class AuthController : ControllerBase
                 roleName = (string)user.RoleNombre,
                 esSuperAdmin,
                 dictationEnabled = (bool)user.DictationEnabled,
+                clinicId = user.ClinicId is null ? null : ((Guid)user.ClinicId).ToString(),
+                hasPersonalPlan = (bool)user.HasPersonalPlan,
+                assistantScope = (string)user.AssistantScope,
                 specialties,
             }
         });

@@ -34,8 +34,13 @@
   - `GET /api/patients` paginado + `GET /api/patients/lookup?document=...` para paciente portátil.
   - `FinanceContext.tsx` desacoplado para Plan Clínico, `assets.ts` extraído y plantillas demo de dictado solo en `DEV`.
   - `registry.ts` actualizado con resolución componible multi-especialidad N:M y `AuthController.cs` devolviendo `specialties`.
-  - **Módulo Gastroenterología (`M-16`):** Creado `src/modules/especialidades/gastroenterologia/` (`GastroExamCard.tsx`, `gastroCie10.ts`, `index.ts`), conectado a `registry.ts` y `PediatricConsultationView.tsx` con selector multi-especialidad y verificado con `multiSpecialtyViews.test.tsx` (Solo Pediatría, Solo Gastro adulto, Gastro Pediátrica combinada).
-- **Pendiente posterior (Track B — Plataforma SaaS `S-01`–`S-10`):** Roles `SUPERADMIN`/`ADMIN`/`GERENTE`, doble confirmación 24h, traspaso con `CutoffDate`, planes y suscripciones.
+  - **Módulo Gastroenterología (`M-16`):** Creado `src/modules/especialidades/gastroenterologia/` (`GastroExamCard.tsx`, `gastroCie10.ts`, `index.ts`), conectado a `registry.ts` y `PediatricConsultationView.tsx` con selector multi-especialidad y verificado con `multiSpecialtyViews.test.tsx` (Solo Pediatría, Solo Gastro adulto, Gastro Pediátrica combinada). Promovido hasta `main` (PR #29 / PR #30).
+  - **Plataforma SaaS (Track B — `develop`):**
+    - Esquema SQL SaaS en `DatabaseSchemaInitializer.cs` (`TB_PLANES` con 4 planes base, `TB_SUSCRIPCIONES`, `TB_CLINICA_INVITACIONES`, rol `GERENTE`, `ClinicId`, `HasPersonalPlan`, `AssistantScope`, `ScopeClinicId`, `MaxConsultationDate`, `IsEmergencyContinuity`).
+    - `ClinicsController.cs`: solo `SUPERADMIN` crea/elimina clínicas; `ADMIN`/`GERENTE` ven únicamente su clínica asignada.
+    - `ClinicInvitationsController.cs`: invitación con caducidad de 24h y doble confirmación (médico acepta → clínica confirma).
+    - `DiagnosisPermissionsController.cs` + `PatientsController.cs`: endpoint `POST /api/diagnosis-permissions/handover` para traspaso de cartera con `CutoffDate` (y continuidad excepcional solo con `SUPERADMIN`).
+    - `SubscriptionsController.cs` + `SaasSubscriptionView.tsx`: planes, cupos, activación de Plan Personal (`upgrade-personal`) y gestión de invitaciones 24h.
 
 ## Comandos Clave de Verificación
 ```powershell
