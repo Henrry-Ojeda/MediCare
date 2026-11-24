@@ -60,6 +60,14 @@ public sealed class AppointmentsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] DateTime? date, [FromQuery] string? stage, [FromQuery] Guid? doctorUserId, CancellationToken ct)
     {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        Guid? currentUserId = Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : null;
+        bool isDoctor = role.Equals("MEDICO", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("PEDIATRA", StringComparison.OrdinalIgnoreCase);
+        bool isAssistant = role.Equals("ASISTENTE", StringComparison.OrdinalIgnoreCase);
+
+        Guid? effectiveDoctorId = isDoctor && currentUserId.HasValue ? currentUserId.Value : doctorUserId;
+
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
         var rows = await conn.QueryAsync(
             """
@@ -70,12 +78,23 @@ public sealed class AppointmentsController : ControllerBase
             INNER JOIN dbo.TB_PACIENTES p ON p.Id = c.PatientId
             INNER JOIN dbo.TB_USUARIOS u ON u.Id = c.DoctorUserId
             INNER JOIN dbo.TB_ESPECIALIDADES e ON e.Id = c.SpecialtyId
-            WHERE (@Date IS NULL OR c.AppointmentDate = @Date)
+            WHERE (@Date IS NULL OR CAST(c.AppointmentDate AS DATE) = CAST(@Date AS DATE))
               AND (@Stage IS NULL OR c.Stage = @Stage)
               AND (@DoctorUserId IS NULL OR c.DoctorUserId = @DoctorUserId)
+              AND (@IsAssistant = 0 OR c.DoctorUserId IN (
+                  SELECT am.MedicoUserId FROM dbo.TB_ASISTENTE_MEDICOS am
+                  WHERE am.AsistenteUserId = @CurrentUserId AND am.Activo = 1
+              ))
             ORDER BY c.AppointmentDate ASC, c.AppointmentTime ASC
             """,
-            new { Date = date, Stage = stage, DoctorUserId = doctorUserId }
+            new
+            {
+                Date = date,
+                Stage = stage,
+                DoctorUserId = effectiveDoctorId,
+                IsAssistant = isAssistant && currentUserId.HasValue ? 1 : 0,
+                CurrentUserId = currentUserId
+            }
         );
         return Ok(rows);
     }
@@ -93,6 +112,20 @@ public sealed class AppointmentsController : ControllerBase
         }
 
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
+
+        var conflict = await conn.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(1) FROM dbo.TB_CITAS
+            WHERE DoctorUserId = @DoctorUserId
+              AND CAST(AppointmentDate AS DATE) = CAST(@Date AS DATE)
+              AND LTRIM(RTRIM(AppointmentTime)) = LTRIM(RTRIM(@Time))
+              AND Stage NOT IN ('cancelado', 'completado')
+            """,
+            new { req.DoctorUserId, req.Date, req.Time }
+        );
+        if (conflict > 0)
+            return Conflict(new { message = "Horario ocupado para este médico." });
+
         var created = await conn.QuerySingleAsync(
             """
             INSERT INTO dbo.TB_CITAS (

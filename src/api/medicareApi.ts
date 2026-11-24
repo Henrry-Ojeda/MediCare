@@ -94,16 +94,8 @@ export const medicareApi = {
       body: JSON.stringify(payload),
     }),
 
-  grantDiagnosisPermission: (patientId: string, payload: Record<string, unknown>) =>
-    apiFetch<Record<string, unknown>>(`/patients/${patientId}/diagnosis-permissions`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-
-  revokeDiagnosisPermission: (patientId: string, permissionId: string) =>
-    apiFetch<{ ok: boolean }>(`/patients/${patientId}/diagnosis-permissions/${permissionId}`, {
-      method: 'DELETE',
-    }),
+  lookupPatientByDocument: (document: string) =>
+    apiFetch<unknown[]>(`/patients/lookup?document=${encodeURIComponent(document)}`),
 
   getAppointments: (params?: { date?: string; stage?: string }) => {
     const qs = new URLSearchParams();

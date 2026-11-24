@@ -13,6 +13,7 @@ builder.WebHost.UseUrls(serverUrl);
 
 builder.Services.AddSingleton<DbConnectionFactory>();
 builder.Services.AddSingleton<AuditService>();
+builder.Services.AddHostedService<DatabaseSchemaInitializer>();
 builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

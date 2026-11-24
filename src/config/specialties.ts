@@ -49,6 +49,23 @@ export const SPECIALTY_REGISTRY: Record<Specialty, SpecialtyConfig> = {
     recordFields: [],
     accentColor: '#0284C7',
   },
+  Gastroenterología: {
+    code: 'GASTROENTEROLOGIA',
+    name: 'Gastroenterología',
+    saasModuleCode: 'esp_gastroenterologia',
+    supportsPerinatal: false,
+    supportsGrowthCurve: false,
+    supportsPediatricVaccines: false,
+    guideLabel: 'Plan dietético e indicaciones digestivas',
+    examSections: ['General', 'Abdomen por Cuadrantes', 'Hábito Intestinal (Bristol)', 'Reflujo / Motilidad', 'Antecedentes Endoscópicos'],
+    recordFields: [
+      { key: 'escalaBristol', label: 'Escala de Bristol (1-7)', placeholder: 'Ej. Tipo 4 (normal)' },
+      { key: 'reflujoPirosis', label: 'Reflujo / Pirosis / Disfagia', placeholder: 'Ej. Pirosis postprandial leve' },
+      { key: 'intolerancias', label: 'Intolerancias Alimentarias', placeholder: 'Ej. Lactosa, gluten, FODMAP' },
+      { key: 'endoscopias', label: 'Antecedentes Endoscópicos / Hepáticos', placeholder: 'Ej. EDS previa 2024 sin lesiones' },
+    ],
+    accentColor: '#059669',
+  },
   Ginecología: {
     code: 'GINECOLOGIA',
     name: 'Ginecología',

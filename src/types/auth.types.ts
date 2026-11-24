@@ -26,6 +26,7 @@ export interface AuthUser {
   esSuperAdmin?: boolean;
   avatarUrl?: string;
   specialty?: string;
+  specialties?: string[];
   licenseNumber?: string;
   dictationEnabled?: boolean;
 }

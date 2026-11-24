@@ -140,36 +140,6 @@ export const WaitingRoomView: React.FC = () => {
     appointments.find((a) => a.stage === 'en_sala') ||
     appointments.find((a) => a.stage === 'programado');
 
-  if (userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
-    return (
-      <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4 shadow-xs">
-        <div className="w-12 h-12 rounded-2xl bg-sky-50 text-[#0284C7] flex items-center justify-center mx-auto">
-          <Stethoscope className="w-6 h-6" />
-        </div>
-        <h2 className="text-base font-bold text-slate-900">Sala de Espera Digital Desactivada</h2>
-        <p className="text-xs text-slate-600">
-          No tienes un asistente asignado, por lo que no se gestiona sala de espera digital. Los pacientes hacen su fila por orden de llegada y puedes buscarlos directamente para atenderlos.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
-          <button
-            type="button"
-            onClick={() => setCurrentView('pacientes')}
-            className="px-4 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold cursor-pointer"
-          >
-            Buscar Paciente
-          </button>
-          <button
-            type="button"
-            onClick={() => setCurrentView('consulta-activa')}
-            className="px-4 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-bold cursor-pointer"
-          >
-            Ir a Consulta
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Barra superior: Ingreso rápido a Sala de Espera + Llamar Siguiente Paciente */}
