@@ -3,7 +3,6 @@ export { DoctorSignatureView } from './DoctorSignatureView';
 export { ClinicSettingsView } from './ClinicSettingsView';
 export { RecipeTemplateDesignerView } from './RecipeTemplateDesignerView';
 export { AiModuleConfigView } from './AiModuleConfigView';
-export { AdminUsersView } from './AdminUsersView';
 export { AdminDoctorsView } from './AdminDoctorsView';
 export { AdminAssistantsView } from './AdminAssistantsView';
 export { AdminClinicsView } from './AdminClinicsView';

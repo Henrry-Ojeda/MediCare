@@ -154,23 +154,27 @@ export const ClinicalDictationBar: React.FC<ClinicalDictationBarProps> = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-sky-200/70 flex items-center gap-1 mr-1">
-            <Volume2 className="w-3.5 h-3.5" /> Plantillas rápidas:
-          </span>
-          {Object.entries(DEMO_DICTATION_SCRIPTS)
-            .filter(([key]) => key.startsWith('pediatria'))
-            .map(([key, item]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setTranscript(item.transcript)}
-                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-medium transition-colors"
-              >
-                {item.label}
-              </button>
-            ))}
-        </div>
+        {import.meta.env.DEV ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-sky-200/70 flex items-center gap-1 mr-1">
+              <Volume2 className="w-3.5 h-3.5" /> Plantillas rápidas (DEV):
+            </span>
+            {Object.entries(DEMO_DICTATION_SCRIPTS)
+              .filter(([key]) => key.startsWith('pediatria'))
+              .map(([key, item]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTranscript(item.transcript)}
+                  className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[11px] font-medium transition-colors"
+                >
+                  {item.label}
+                </button>
+              ))}
+          </div>
+        ) : (
+          <span className="text-[11px] text-sky-200/70">Dictado clínico por voz habilitado en tu plan.</span>
+        )}
 
         <button
           type="button"

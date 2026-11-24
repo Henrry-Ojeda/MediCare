@@ -16,6 +16,12 @@ import { ClinicalDictationBar } from '../components/ClinicalDictationBar';
 import { PediatricAnthropometryCard } from '../components/PediatricAnthropometryCard';
 import { PediatricExamCard, PhysicalExamState } from '../components/PediatricExamCard';
 import { PediatricPrescriptionCard } from '../components/PediatricPrescriptionCard';
+import {
+  GastroExamCard,
+  GastroExamState,
+  INITIAL_GASTRO_EXAM,
+} from '../../gastroenterologia';
+import { resolveActiveSpecialtyPlugins, SPECIALTY_REGISTRY } from '../../registry';
 import { CreateRecipeModal } from '../../../../components/recipe/CreateRecipeModal';
 import { PatientForm } from '../../../pacientes/components/PatientForm';
 
@@ -54,6 +60,25 @@ export const PediatricConsultationView: React.FC = () => {
   const activePatient = selectedPatient;
   const ageMonths = activePatient ? calculateAgeInMonths(activePatient.birthDate) : 24;
   const ageLabel = activePatient ? calculateExactAgeLabel(activePatient.birthDate) : '2 años';
+
+  const [gastroExam, setGastroExam] = useState<GastroExamState>(INITIAL_GASTRO_EXAM);
+  const [manualSpecialties, setManualSpecialties] = useState<string[] | undefined>(undefined);
+
+  const doctorSpecialtyCodes = useMemo(
+    () =>
+      currentUser?.specialties && currentUser.specialties.length > 0
+        ? currentUser.specialties
+        : ['pediatria'],
+    [currentUser?.specialties]
+  );
+
+  const activePlugins = useMemo(
+    () => resolveActiveSpecialtyPlugins(doctorSpecialtyCodes, ageMonths, manualSpecialties),
+    [doctorSpecialtyCodes, ageMonths, manualSpecialties]
+  );
+
+  const isPediatricActive = activePlugins.some((p) => p.id === 'pediatria');
+  const isGastroActive = activePlugins.some((p) => p.id === 'gastroenterologia');
 
   const [vitals, setVitals] = useState<VitalSigns>(
     activePatient?.latestVitals || {
@@ -354,22 +379,38 @@ export const PediatricConsultationView: React.FC = () => {
   };
 
   const handleFinalizeAndSend = () => {
+    const gastroSummaryParts: string[] = [];
+    if (isGastroActive) {
+      if (gastroExam.bristolType) gastroSummaryParts.push(`Bristol Tipo ${gastroExam.bristolType}`);
+      if (gastroExam.symptoms.length > 0) gastroSummaryParts.push(`Síntomas GI: ${gastroExam.symptoms.join(', ')}`);
+      if (gastroExam.quadrants.length > 0) gastroSummaryParts.push(`Cuadrantes: ${gastroExam.quadrants.join(', ')}`);
+      if (gastroExam.intolerances.length > 0) gastroSummaryParts.push(`Intolerancias: ${gastroExam.intolerances.join(', ')}`);
+      if (gastroExam.endoscopyHistory.trim()) gastroSummaryParts.push(`Endoscopia/Hepático: ${gastroExam.endoscopyHistory.trim()}`);
+    }
+    const combinedExamSummary = [formattedExamString, ...gastroSummaryParts]
+      .filter(Boolean)
+      .join(' | ');
+    const combinedGuide =
+      isGastroActive && gastroExam.dietPlan.trim()
+        ? `${parentGuide ? parentGuide + '\n' : ''}Plan Dietético: ${gastroExam.dietPlan.trim()}`
+        : parentGuide;
+
     const newConsultation: PastConsultationSummary = {
       id: `cons-${Date.now()}`,
       date: getTodayIsoDate(),
       doctorId: currentUser?.id,
-      doctorName: currentUser?.name || doctorSignature.doctorName || 'Pediatra',
-      specialty: 'Pediatría',
+      doctorName: currentUser?.name || doctorSignature.doctorName || 'Médico Tratante',
+      specialty: activePlugins.map((p) => p.shortLabel).join(' · ') as PastConsultationSummary['specialty'],
       cie10Code,
       cie10Name,
-      reason: chiefComplaint.trim() || 'Control pediátrico integral.',
+      reason: chiefComplaint.trim() || 'Control clínico integral.',
       weightKg: vitals.weightKg,
       heightCm: vitals.heightCm,
       temperatureC: vitals.temperatureC,
       bloodPressure: `${vitals.systolicBp}/${vitals.diastolicBp}`,
-      physicalExamSummary: formattedExamString,
+      physicalExamSummary: combinedExamSummary,
       prescriptions,
-      parentGuide,
+      parentGuide: combinedGuide,
       alarmSigns,
     };
 
@@ -423,6 +464,45 @@ export const PediatricConsultationView: React.FC = () => {
         onBack={() => setCurrentView('paciente-detalle')}
         onOpenVaccines={() => navigateToPatientVaccines(activePatient.id)}
       />
+
+      {doctorSpecialtyCodes.length > 1 && (
+        <div
+          data-testid="multi-specialty-bar"
+          className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 flex flex-wrap items-center justify-between gap-2 shadow-xs"
+        >
+          <span className="text-xs font-bold text-slate-700">
+            Especialidades activas en esta consulta:
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {doctorSpecialtyCodes.map((code) => {
+              const plugin = SPECIALTY_REGISTRY[code.trim().toLowerCase()];
+              if (!plugin) return null;
+              const isActive = activePlugins.some((p) => p.id === plugin.id);
+              return (
+                <button
+                  key={plugin.id}
+                  type="button"
+                  onClick={() => {
+                    const currentIds = activePlugins.map((p) => p.id);
+                    const next = isActive
+                      ? currentIds.filter((id) => id !== plugin.id)
+                      : [...currentIds, plugin.id];
+                    setManualSpecialties(next.length > 0 ? next : [plugin.id]);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    isActive
+                      ? 'bg-sky-50 border-sky-400 text-sky-800'
+                      : 'bg-slate-50 border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {isActive ? '✓ ' : '+ '}
+                  {plugin.shortLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {canUseDictation && (
         <ClinicalDictationBar
@@ -488,6 +568,7 @@ export const PediatricConsultationView: React.FC = () => {
         sex={activePatient.sex}
         previousGrowth={activePatient.growthHistory[activePatient.growthHistory.length - 1]}
         visibleFields={doctorFieldPrefs}
+        showPediatricMetrics={isPediatricActive}
         onChange={setVitals}
       />
 
@@ -566,6 +647,18 @@ export const PediatricConsultationView: React.FC = () => {
           setCie10Name(name);
         }}
       />
+
+      {isGastroActive && (
+        <GastroExamCard
+          value={gastroExam}
+          onChange={setGastroExam}
+          selectedCie10Code={cie10Code}
+          onSelectCie10={(code, name) => {
+            setCie10Code(code);
+            setCie10Name(name);
+          }}
+        />
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
         <div className="flex items-center gap-2.5">

@@ -1,6 +1,7 @@
 export type Specialty =
   | 'Medicina General'
   | 'Pediatría'
+  | 'Gastroenterología'
   | 'Ginecología'
   | 'Medicina Interna / Cardiología'
   | 'Traumatología'
@@ -15,7 +16,6 @@ export type ViewId =
   | 'perfil'                 // Perfil de Usuario
   | 'firma-medico'           // Firma del Médico y Sello Digital
   | 'ia-modulo'              // Módulo IA (Gemini por médico)
-  | 'admin-usuarios'         // Gestión de Personal y Asistentes (Admin)
   | 'admin-doctores'         // CRUD de Doctores (Admin)
   | 'admin-asistentes'       // CRUD de Asistentes y Asignación M:N (Admin)
   | 'admin-clinicas'         // CRUD de Clínicas y Asociación Clínica-Médico-Asistente (Admin)
@@ -307,6 +307,7 @@ export interface DoctorProfile {
   username?: string;
   avatarUrl?: string;
   specialty: Specialty;
+  specialties?: string[];
   licenseNumber: string;
   dictationEnabled?: boolean;
 }

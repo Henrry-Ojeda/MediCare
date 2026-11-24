@@ -103,6 +103,29 @@ public sealed class AuthController : ControllerBase
             fallbackUserRole: (string)user.RoleNombre
         );
 
+        var specialties = new List<string>();
+        try
+        {
+            var specRows = await conn.QueryAsync<string>(
+                """
+                IF OBJECT_ID('dbo.TB_MEDICO_ESPECIALIDADES', 'U') IS NOT NULL
+                BEGIN
+                    SELECT LOWER(e.Codigo)
+                    FROM dbo.TB_MEDICO_ESPECIALIDADES me
+                    INNER JOIN dbo.TB_ESPECIALIDADES e ON e.Id = me.SpecialtyId
+                    WHERE me.DoctorUserId = @UserId AND me.Activo = 1
+                    ORDER BY me.IsPrimary DESC, e.Nombre ASC
+                END
+                """,
+                new { UserId = (Guid)user.Id }
+            );
+            specialties.AddRange(specRows);
+        }
+        catch { }
+
+        if (specialties.Count == 0)
+            specialties.Add("pediatria");
+
         return Ok(new
         {
             token,
@@ -118,6 +141,7 @@ public sealed class AuthController : ControllerBase
                 roleName = (string)user.RoleNombre,
                 esSuperAdmin,
                 dictationEnabled = (bool)user.DictationEnabled,
+                specialties,
             }
         });
     }

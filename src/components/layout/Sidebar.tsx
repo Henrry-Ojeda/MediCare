@@ -22,7 +22,7 @@ import { UserRole } from '../../types/auth.types';
 import { canRoleAccessView } from '../../config/permissions.config';
 import { useAuth } from '../../context/AuthContext';
 import { useClinical } from '../../context/ClinicalContext';
-import { ASSETS } from '../../data/mockClinicalData';
+import { ASSETS } from '../../config/assets';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -88,13 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onCloseMobile }) =
 
   const visibleSections = NAV_SECTIONS.map((section) => ({
     ...section,
-    items: section.items.filter((item) => {
-      if (!canRoleAccessView(userRole, item.id)) return false;
-      if (item.id === 'sala-espera' && userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
-        return false;
-      }
-      return true;
-    }),
+    items: section.items.filter((item) => canRoleAccessView(userRole, item.id)),
   })).filter((section) => section.items.length > 0);
 
   const handleNavigate = (viewId: ViewId) => {

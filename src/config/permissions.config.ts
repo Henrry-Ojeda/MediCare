@@ -31,7 +31,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
       'consulta-activa',
       'firma-medico',
       'plantillas',
-      'ia-modulo',
       'configuracion',
       'perfil',
     ],
@@ -71,7 +70,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissionRule> = {
     defaultView: 'dashboard',
     allowedViews: [
       'dashboard',
-      'admin-usuarios',
       'admin-doctores',
       'admin-asistentes',
       'admin-clinicas',
