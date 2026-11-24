@@ -4,8 +4,8 @@ import { NotificationProvider } from './context/NotificationContext';
 import { NavigationProvider } from './context/NavigationContext';
 import { ClinicalProvider, useClinical } from './context/ClinicalContext';
 import { AppLayout } from './components/layout/AppLayout';
-import { TriageModal } from './modules/agenda';
-import { ApplyVaccineDoseModal } from './modules/especialidades/pediatria';
+import { TriageModal } from './modules/agenda/TriageModal';
+import { ApplyVaccineDoseModal } from './modules/especialidades/pediatria/components/ApplyVaccineDoseModal';
 import { RecipeDispatchModal } from './components/recipe/RecipeDispatchModal';
 import { canRoleAccessView, isViewEnabledInSprint } from './config/permissions.config';
 
@@ -52,9 +52,6 @@ const DoctorSignatureView = lazy(() =>
 );
 const ClinicSettingsView = lazy(() =>
   import('./modules/firma-y-config').then((m) => ({ default: m.ClinicSettingsView }))
-);
-const AdminUsersView = lazy(() =>
-  import('./modules/firma-y-config').then((m) => ({ default: m.AdminUsersView }))
 );
 const AdminDoctorsView = lazy(() =>
   import('./modules/firma-y-config').then((m) => ({ default: m.AdminDoctorsView }))
@@ -134,9 +131,6 @@ const AuthenticatedRouter: React.FC = () => {
       case 'agenda':
         return <AgendaView />;
       case 'sala-espera':
-        if (userRole === 'PEDIATRA' && !currentDoctorHasAssistant) {
-          return <DashboardView />;
-        }
         return <WaitingRoomView />;
       case 'pacientes':
         return <PatientDirectoryView />;
@@ -154,8 +148,6 @@ const AuthenticatedRouter: React.FC = () => {
         return <DoctorSignatureView />;
       case 'perfil':
         return <UserProfileView />;
-      case 'admin-usuarios':
-        return <AdminUsersView />;
       case 'admin-doctores':
         return <AdminDoctorsView />;
       case 'admin-asistentes':

@@ -42,9 +42,17 @@ public sealed class PatientsController : ControllerBase
     );
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? q, CancellationToken ct)
+    public async Task<IActionResult> List(
+        [FromQuery] string? q,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100,
+        CancellationToken ct = default)
     {
         var search = $"%{(q ?? string.Empty).Trim()}%";
+        var safePage = Math.Max(1, page);
+        var safePageSize = Math.Clamp(pageSize, 1, 200);
+        var offset = (safePage - 1) * safePageSize;
+
         await using var conn = await _db.CreateOpenConnectionAsync(ct);
 
         var rows = await conn.QueryAsync(
@@ -61,10 +69,42 @@ public sealed class PatientsController : ControllerBase
                 OR p.FirstName LIKE @Search
                 OR p.LastName LIKE @Search
                 OR p.HistoryNumber LIKE @Search
+                OR p.IdDocument LIKE @Search
+                OR p.GuardianIdDocument LIKE @Search
                 OR p.GuardianName LIKE @Search)
             ORDER BY p.CreatedAt DESC
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
             """,
-            new { Search = search }
+            new { Search = search, Offset = offset, PageSize = safePageSize }
+        );
+
+        return Ok(rows);
+    }
+
+    [HttpGet("lookup")]
+    public async Task<IActionResult> LookupByDocument([FromQuery] string document, CancellationToken ct)
+    {
+        var clean = (document ?? string.Empty).Trim();
+        if (clean.Length < 4)
+            return BadRequest(new { message = "Ingrese al menos 4 caracteres de cédula o número de historia." });
+
+        await using var conn = await _db.CreateOpenConnectionAsync(ct);
+        var rows = await conn.QueryAsync(
+            """
+            SELECT TOP 10 p.Id, p.HistoryNumber, p.FirstName, p.LastName, p.Sex, p.BirthDate,
+                   p.IdDocument, p.BloodType, p.PrimarySpecialtyId,
+                   e.Nombre AS PrimarySpecialtyName,
+                   p.GuardianName, p.GuardianRelation, p.GuardianWhatsapp, p.GuardianEmail,
+                   p.CreatedAt
+            FROM dbo.TB_PACIENTES p
+            INNER JOIN dbo.TB_ESPECIALIDADES e ON e.Id = p.PrimarySpecialtyId
+            WHERE p.Activo = 1
+              AND (LOWER(ISNULL(p.IdDocument, '')) = LOWER(@Doc)
+                OR LOWER(ISNULL(p.GuardianIdDocument, '')) = LOWER(@Doc)
+                OR LOWER(p.HistoryNumber) = LOWER(@Doc))
+            ORDER BY p.CreatedAt DESC
+            """,
+            new { Doc = clean }
         );
 
         return Ok(rows);
@@ -286,112 +326,6 @@ public sealed class PatientsController : ControllerBase
             vaccines,
             studies
         });
-    }
-
-    public sealed record GrantDiagnosisPermissionRequest(
-        Guid? ConsultationId,
-        int GrantedBySpecialtyId,
-        int TargetSpecialtyId,
-        Guid? TargetDoctorUserId,
-        string? Reason,
-        DateTime? ExpiresAt
-    );
-
-    [HttpPost("{id:guid}/diagnosis-permissions")]
-    [Authorize(Roles = "SUPERADMIN,ADMIN,MEDICO")]
-    public async Task<IActionResult> GrantDiagnosisPermission(
-        Guid id,
-        [FromBody] GrantDiagnosisPermissionRequest req,
-        CancellationToken ct)
-    {
-        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(userIdStr, out var grantedByUserId))
-            return Unauthorized(new { message = "Usuario no identificado." });
-
-        await using var conn = await _db.CreateOpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
-
-        try
-        {
-            var created = await conn.QuerySingleAsync(
-                """
-                INSERT INTO dbo.TB_PERMISOS_DIAGNOSTICO (
-                    PatientId, ConsultationId, GrantedByUserId, GrantedBySpecialtyId,
-                    TargetSpecialtyId, TargetDoctorUserId, Reason, ExpiresAt
-                )
-                OUTPUT INSERTED.*
-                VALUES (
-                    @PatientId, @ConsultationId, @GrantedByUserId, @GrantedBySpecialtyId,
-                    @TargetSpecialtyId, @TargetDoctorUserId, @Reason, @ExpiresAt
-                )
-                """,
-                new
-                {
-                    PatientId = id,
-                    req.ConsultationId,
-                    GrantedByUserId = grantedByUserId,
-                    req.GrantedBySpecialtyId,
-                    req.TargetSpecialtyId,
-                    req.TargetDoctorUserId,
-                    req.Reason,
-                    req.ExpiresAt
-                },
-                transaction: tx
-            );
-
-            await _audit.RecordAsync(
-                conn, tx, HttpContext, "Permiso de Diagnóstico a Especialista",
-                "TB_PERMISOS_DIAGNOSTICO", created.Id.ToString(), id,
-                newValue: new { req.TargetSpecialtyId, req.ConsultationId, req.Reason }
-            );
-
-            await tx.CommitAsync(ct);
-            return StatusCode(201, created);
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
-    }
-
-    [HttpDelete("{id:guid}/diagnosis-permissions/{permissionId:guid}")]
-    [Authorize(Roles = "SUPERADMIN,ADMIN,MEDICO")]
-    public async Task<IActionResult> RevokeDiagnosisPermission(
-        Guid id,
-        Guid permissionId,
-        CancellationToken ct)
-    {
-        await using var conn = await _db.CreateOpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
-
-        try
-        {
-            var rows = await conn.ExecuteAsync(
-                "UPDATE dbo.TB_PERMISOS_DIAGNOSTICO SET Activo = 0 WHERE Id = @PermissionId AND PatientId = @PatientId",
-                new { PermissionId = permissionId, PatientId = id },
-                transaction: tx
-            );
-
-            if (rows == 0)
-            {
-                await tx.RollbackAsync(ct);
-                return NotFound(new { message = "Permiso no encontrado." });
-            }
-
-            await _audit.RecordAsync(
-                conn, tx, HttpContext, "Revocación de Permiso de Diagnóstico",
-                "TB_PERMISOS_DIAGNOSTICO", permissionId.ToString(), id
-            );
-
-            await tx.CommitAsync(ct);
-            return Ok(new { ok = true });
-        }
-        catch
-        {
-            await tx.RollbackAsync(ct);
-            throw;
-        }
     }
 
     [HttpPost]

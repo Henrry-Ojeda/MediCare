@@ -210,6 +210,38 @@ public sealed class DiagnosisPermissionsController : ControllerBase
             "TB_PERMISOS_DIAGNOSTICO", newId.ToString(), req.PatientId
         );
 
+        try
+        {
+            var requesterName = User.FindFirstValue(ClaimTypes.Name) ?? "Un médico";
+            var patientName = await conn.QueryFirstOrDefaultAsync<string?>(
+                "SELECT FirstName + ' ' + LastName FROM dbo.TB_PACIENTES WHERE Id = @PatientId",
+                new { req.PatientId }
+            ) ?? "un paciente";
+
+            await conn.ExecuteAsync(
+                """
+                IF COL_LENGTH('dbo.TB_NOTIFICACIONES', 'TargetUserId') IS NULL
+                    ALTER TABLE dbo.TB_NOTIFICACIONES ADD TargetUserId NVARCHAR(100) NULL;
+                INSERT INTO dbo.TB_NOTIFICACIONES
+                    (Id, Title, Message, Category, Priority, TargetRoles, CreatedAtLabel, IsRead, PatientId, TargetUserId)
+                VALUES
+                    (@NotifId, @Title, @Message, 'diagnostico', 'alta', 'MEDICO,PEDIATRA', 'Ahora', 0, @PatientIdStr, @TargetUserId)
+                """,
+                new
+                {
+                    NotifId = $"diag-req-{newId:N}",
+                    Title = "Solicitud de acceso a diagnóstico",
+                    Message = $"{requesterName} solicita permiso para ver el diagnóstico de {patientName}.",
+                    PatientIdStr = req.PatientId.ToString(),
+                    TargetUserId = authorDoctorUserId.Value.ToString(),
+                }
+            );
+        }
+        catch
+        {
+            // No bloquear la solicitud si TB_NOTIFICACIONES no está disponible
+        }
+
         return StatusCode(201, new { id = newId.ToString(), status = "PENDING" });
     }
 

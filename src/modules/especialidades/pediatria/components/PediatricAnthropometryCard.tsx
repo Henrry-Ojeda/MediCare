@@ -20,6 +20,7 @@ interface PediatricAnthropometryCardProps {
   sex?: 'M' | 'F';
   previousGrowth?: GrowthMeasurement;
   visibleFields?: AnthropometryVisibleFields;
+  showPediatricMetrics?: boolean;
   onChange: (updated: VitalSigns) => void;
 }
 
@@ -29,6 +30,7 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
   sex = 'M',
   previousGrowth,
   visibleFields = { respiratoryRate: true, headCircumference: true, bloodPressure: true, spo2: true },
+  showPediatricMetrics = true,
   onChange,
 }) => {
   const bmi = calculateBmi(vitals.weightKg, vitals.heightCm);
@@ -66,9 +68,11 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
           <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-[11px] font-bold">
             IMC: {bmi} kg/m²
           </span>
-          <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
-            {oms.statusLabel}
-          </span>
+          {showPediatricMetrics && (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+              {oms.statusLabel}
+            </span>
+          )}
         </div>
       </div>
 
@@ -137,7 +141,7 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
             />
           </div>
         )}
-        {visibleFields.headCircumference !== false && (
+        {showPediatricMetrics && visibleFields.headCircumference !== false && (
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1">P. Cefálico (cm)</label>
             <input
@@ -173,6 +177,7 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
         )}
       </div>
 
+      {showPediatricMetrics && (
       <div className="space-y-2 pt-1">
         <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
           <Activity className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -271,6 +276,7 @@ export const PediatricAnthropometryCard: React.FC<PediatricAnthropometryCardProp
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
