@@ -27,6 +27,25 @@ export const SPECIALTY_REGISTRY: Record<string, SpecialtyPluginMeta> = {
       { id: 'extremidades', label: 'Extremidades / Neurológico' },
     ],
   },
+  gastroenterologia: {
+    id: 'gastroenterologia',
+    code: 'GASTROENTEROLOGIA',
+    shortLabel: 'Gastroenterología',
+    name: 'Gastroenterología y Endoscopia',
+    activeInSprint: true,
+    isPediatricOnly: false,
+    accentColor: '#059669',
+    supportsPerinatal: false,
+    supportsGrowthCurve: false,
+    supportsPediatricVaccines: false,
+    guideLabel: 'Plan dietético e indicaciones digestivas',
+    examSections: [
+      { id: 'bristol', label: 'Escala de Bristol' },
+      { id: 'quadrants', label: 'Dolor por Cuadrantes' },
+      { id: 'intolerances', label: 'Intolerancias Alimentarias' },
+      { id: 'endoscopy', label: 'Antecedentes Endoscópicos' },
+    ],
+  },
 };
 
 export const ACTIVE_SPECIALTIES = Object.values(SPECIALTY_REGISTRY).filter((s) => s.activeInSprint);

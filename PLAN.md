@@ -34,7 +34,7 @@
   - `GET /api/patients` paginado + `GET /api/patients/lookup?document=...` para paciente portátil.
   - `FinanceContext.tsx` desacoplado para Plan Clínico, `assets.ts` extraído y plantillas demo de dictado solo en `DEV`.
   - `registry.ts` actualizado con resolución componible multi-especialidad N:M y `AuthController.cs` devolviendo `specialties`.
-- **Siguiente hito inmediato (`M-16`):** Crear el módulo independiente de **Gastroenterología** (`src/modules/especialidades/gastroenterologia/`) con toda la información clínica de la especialidad (Bristol, reflujo, cuadrantes, antecedentes endoscópicos, plan dietético, CIE-10 digestivo) y realizar pruebas de vista en 3 escenarios (Solo Pediatría, Solo Gastro adulto, Gastro Pediátrica combinada).
+  - **Módulo Gastroenterología (`M-16`):** Creado `src/modules/especialidades/gastroenterologia/` (`GastroExamCard.tsx`, `gastroCie10.ts`, `index.ts`), conectado a `registry.ts` y `PediatricConsultationView.tsx` con selector multi-especialidad y verificado con `multiSpecialtyViews.test.tsx` (Solo Pediatría, Solo Gastro adulto, Gastro Pediátrica combinada).
 - **Pendiente posterior (Track B — Plataforma SaaS `S-01`–`S-10`):** Roles `SUPERADMIN`/`ADMIN`/`GERENTE`, doble confirmación 24h, traspaso con `CutoffDate`, planes y suscripciones.
 
 ## Comandos Clave de Verificación

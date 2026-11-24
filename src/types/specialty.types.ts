@@ -1,5 +1,7 @@
 export type SpecialtyId =
   | 'pediatria'
+  | 'gastroenterologia'
+  | 'medicina-general'
   | 'ginecologia'
   | 'cardiologia'
   | 'traumatologia'
